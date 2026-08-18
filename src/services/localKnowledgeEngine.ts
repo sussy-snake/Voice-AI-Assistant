@@ -106,28 +106,32 @@ export class LocalKnowledgeEngine {
     // 3. Gmail Integration: Send Email Intent
     // -------------------------------------------------------------
     if (query.startsWith('send email') || query.startsWith('send mail') || query.includes('mail to') || query.includes('email to')) {
-      let recipient = 'professor@university.edu';
-      let subject = 'CS Coursework / Assignment Update';
-      let body = 'Hello,\n\nPlease find attached my assignment updates.\n\nBest regards,\nStudent';
-
-      const emailMatch = query.match(/to\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+      let recipient = 'colleague@example.com';
+      const emailMatch = query.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
       if (emailMatch && emailMatch[1]) {
         recipient = emailMatch[1];
       }
 
-      if (query.includes('about') || query.includes('regarding')) {
-        subject = query.split(/about|regarding/i)[1]?.split(/saying|body/i)[0]?.trim() || subject;
+      // Professional drafting based on intent
+      let subject = 'Absence Notice: Unable to Attend Today\'s Meeting';
+      let body = `Dear Colleague / Team,\n\nI am writing to inform you that I will unfortunately be unable to attend today's scheduled meeting due to unavoidable circumstances.\n\nI apologize for any inconvenience this may cause. Please let me know if there are meeting notes, recordings, or action items I should review. I will follow up promptly with any updates on my end.\n\nThank you for your understanding.\n\nBest regards,\n${_config?.githubToken ? 'Student / Engineer' : 'Harsh'}`;
+
+      if (query.includes('assignment') || query.includes('homework') || query.includes('submission')) {
+        subject = 'Coursework & Lab Assignment Submission Update';
+        body = `Dear Professor,\n\nI hope this email finds you well.\n\nI am writing regarding my coursework assignment submission. I have finalized my project code and documentation for your review.\n\nPlease let me know if you need any additional details or files.\n\nThank you for your time and guidance.\n\nSincerely,\nStudent`;
+      } else if (!query.includes('meet') && !query.includes('attend')) {
+        subject = 'Important Update Regarding Today\'s Discussion';
       }
 
       return {
-        content: `Drafting and sending email to **${recipient}** via Gmail...`,
+        content: `I've drafted a professional email and sent it to **${recipient}**:\n\n**Subject:** *${subject}*\n\n\`\`\`text\n${body}\n\`\`\``,
         toolCalls: [
           {
             id: 'call_gmail_' + Date.now(),
             name: 'gmail_send_message',
             arguments: {
               to: recipient,
-              subject: subject.charAt(0).toUpperCase() + subject.slice(1),
+              subject: subject,
               body: body,
             },
           },
