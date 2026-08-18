@@ -120,8 +120,12 @@ export function App() {
     localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
   };
 
-  const handleSaveGoogleToken = (token: string) => {
-    const updated = { ...config, googleAccessToken: token };
+  const handleSaveGoogleTokens = (accessToken: string, refreshToken?: string) => {
+    const updated = {
+      ...config,
+      googleAccessToken: accessToken,
+      googleRefreshToken: refreshToken || config.googleRefreshToken,
+    };
     setConfig(updated);
     localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
   };
@@ -202,7 +206,8 @@ export function App() {
         isOpen={isGoogleModalOpen}
         onClose={() => setIsGoogleModalOpen(false)}
         googleToken={config.googleAccessToken}
-        onSaveToken={handleSaveGoogleToken}
+        googleRefreshToken={config.googleRefreshToken}
+        onSaveTokens={handleSaveGoogleTokens}
       />
 
       <FileExplorerModal

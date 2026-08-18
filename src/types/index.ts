@@ -144,6 +144,7 @@ export interface LLMConfig {
   userName?: string;
   githubToken?: string;
   googleAccessToken?: string;
+  googleRefreshToken?: string;
 }
 
 export interface ToolCall {

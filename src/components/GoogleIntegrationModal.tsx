@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Calendar, Send, Plus, RefreshCw, Clock, ExternalLink, Inbox, Search } from 'lucide-react';
+import { X, Mail, Calendar, Send, Plus, RefreshCw, Clock, ExternalLink, Inbox, Search, CheckCircle2 } from 'lucide-react';
 import { CalendarEventItem, GmailMessageSummary, GmailMessageDetail } from '../types';
 import { TauriBridge } from '../services/tauriBridge';
 
@@ -7,16 +7,19 @@ interface GoogleIntegrationModalProps {
   isOpen: boolean;
   onClose: () => void;
   googleToken?: string;
-  onSaveToken: (token: string) => void;
+  googleRefreshToken?: string;
+  onSaveTokens: (accessToken: string, refreshToken?: string) => void;
 }
 
 export const GoogleIntegrationModal: React.FC<GoogleIntegrationModalProps> = ({
   isOpen,
   onClose,
   googleToken = '',
-  onSaveToken,
+  googleRefreshToken = '',
+  onSaveTokens,
 }) => {
   const [token, setToken] = useState(googleToken);
+  const [refreshToken, setRefreshToken] = useState(googleRefreshToken);
   const [activeTab, setActiveTab] = useState<'inbox' | 'gmail' | 'calendar'>('inbox');
   const [events, setEvents] = useState<CalendarEventItem[]>([]);
   const [messages, setMessages] = useState<GmailMessageSummary[]>([]);
@@ -86,7 +89,10 @@ export const GoogleIntegrationModal: React.FC<GoogleIntegrationModalProps> = ({
     if (googleToken) {
       setToken(googleToken);
     }
-  }, [googleToken, isOpen]);
+    if (googleRefreshToken) {
+      setRefreshToken(googleRefreshToken);
+    }
+  }, [googleToken, googleRefreshToken, isOpen]);
 
   useEffect(() => {
     if (isOpen && token.trim()) {
@@ -95,9 +101,9 @@ export const GoogleIntegrationModal: React.FC<GoogleIntegrationModalProps> = ({
     }
   }, [isOpen, token, activeTab]);
 
-  const handleSaveToken = () => {
-    onSaveToken(token.trim());
-    setStatusMsg('Google Access Token saved!');
+  const handleSaveTokens = () => {
+    onSaveTokens(token.trim(), refreshToken.trim() || undefined);
+    setStatusMsg('Google Tokens saved! Persistent auto-sync is active.');
     if (activeTab === 'inbox') loadInbox();
     if (activeTab === 'calendar') loadCalendarEvents();
   };
@@ -167,25 +173,45 @@ export const GoogleIntegrationModal: React.FC<GoogleIntegrationModalProps> = ({
           </button>
         </div>
 
-        {/* Token Bar */}
+        {/* Token Management Card */}
         <div className="p-3 bg-slate-950/60 border-b border-surfaceBorder space-y-2 text-xs">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-slate-300">Google OAuth Access Token</span>
-            <span className="text-[10px] text-slate-500">Full Access: Read, Search, Send & Calendar</span>
+            <span className="font-semibold text-slate-300">Google OAuth Credentials</span>
+            {token && (
+              <span className="flex items-center space-x-1 text-[10px] text-accent-emerald">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>Connected & Saved</span>
+              </span>
+            )}
           </div>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              placeholder="ya29.a0..."
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-brand-500"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] text-slate-400 mb-0.5">Access Token (ya29...)</label>
+              <input
+                type="password"
+                placeholder="ya29.a0..."
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-slate-400 mb-0.5">Refresh Token (1//04...)</label>
+              <input
+                type="password"
+                placeholder="Auto-refresh token..."
+                value={refreshToken}
+                onChange={(e) => setRefreshToken(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-brand-500"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end pt-1">
             <button
-              onClick={handleSaveToken}
-              className="px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-medium"
+              onClick={handleSaveTokens}
+              className="px-4 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-medium text-xs shadow"
             >
-              Save
+              Save Credentials
             </button>
           </div>
         </div>
@@ -291,7 +317,7 @@ export const GoogleIntegrationModal: React.FC<GoogleIntegrationModalProps> = ({
                   <div className="space-y-1.5 max-h-64 overflow-y-auto">
                     {messages.length === 0 ? (
                       <div className="text-slate-500 text-center py-6">
-                        {token.trim() ? 'No emails found matching query.' : 'Please enter your Google OAuth token above to view emails.'}
+                        {token.trim() ? 'No emails found matching query.' : 'Please enter your Google OAuth credentials above to view emails.'}
                       </div>
                     ) : (
                       messages.map((m) => (
