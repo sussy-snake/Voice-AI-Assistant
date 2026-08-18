@@ -121,6 +121,7 @@ export interface LLMConfig {
   anthropicModel: string;
   systemPrompt: string;
   temperature: number;
+  userName?: string;
   githubToken?: string;
   googleAccessToken?: string;
 }

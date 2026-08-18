@@ -108,7 +108,7 @@ export class LocalKnowledgeEngine {
     if (query.startsWith('send email') || query.startsWith('send mail') || query.includes('mail to') || query.includes('email to')) {
       let recipient = 'professor@university.edu';
       let subject = 'CS Coursework / Assignment Update';
-      let body = 'Hello,\n\nPlease find attached my assignment updates.\n\nBest regards,\nHarsh';
+      let body = 'Hello,\n\nPlease find attached my assignment updates.\n\nBest regards,\nStudent';
 
       const emailMatch = query.match(/to\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
       if (emailMatch && emailMatch[1]) {

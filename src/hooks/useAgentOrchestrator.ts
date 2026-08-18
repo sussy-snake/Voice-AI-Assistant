@@ -8,8 +8,7 @@ export function useAgentOrchestrator(config: LLMConfig) {
     {
       id: 'welcome',
       role: 'assistant',
-      content:
-        "Hello Harsh! I'm your native desktop **AI Companion & CS Assistant**.\n\nI'm running locally in the background. You can speak or type to me to:\n- 🐙 **Git & GitHub:** *\"Create a repo named os-lab and push code\"* or *\"Git status\"*\n- ✉️ **Gmail:** *\"Send email to professor@college.edu regarding my assignment\"*\n- 📅 **Google Calendar:** *\"Mark DSA midterm on my Google Calendar for Friday\"*\n- ⚡ **Offline NPU/CPU Compute:** *\"Run hardware compute benchmark\"*\n- 🔍 **Filesystem:** *\"Find my DBMS pdf notes\"*",
+      content: `Hello ${config.userName || 'there'}! I'm your native desktop **AI Companion & CS Assistant**.\n\nI'm running locally in the background. You can speak or type to me to:\n- 🐙 **Git & GitHub:** *"Create a repo named os-lab and push code"* or *"Git status"*\n- ✉️ **Gmail:** *"Send email to professor@college.edu regarding my assignment"*\n- 📅 **Google Calendar:** *"Mark DSA midterm on my Google Calendar for Friday"*\n- ⚡ **Offline NPU/CPU Compute:** *"Run hardware compute benchmark"*\n- 🔍 **Filesystem:** *"Find my DBMS pdf notes"*`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);

@@ -313,14 +313,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* System Prompt Tab */}
           {activeTab === 'system' && (
-            <div className="space-y-2">
-              <label className="block text-slate-300 font-semibold">System Instructions & Companion Role</label>
-              <textarea
-                rows={8}
-                value={localConfig.systemPrompt}
-                onChange={(e) => setLocalConfig({ ...localConfig, systemPrompt: e.target.value })}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 font-mono text-[11px] focus:outline-none focus:border-brand-500"
-              />
+            <div className="space-y-3.5">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Your Name</label>
+                <input
+                  type="text"
+                  value={localConfig.userName || ''}
+                  onChange={(e) => setLocalConfig({ ...localConfig, userName: e.target.value })}
+                  placeholder="Your Name (e.g. Harsh)..."
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white text-xs focus:outline-none focus:border-brand-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-slate-300 font-semibold">System Instructions & Companion Role</label>
+                <textarea
+                  rows={8}
+                  value={localConfig.systemPrompt}
+                  onChange={(e) => setLocalConfig({ ...localConfig, systemPrompt: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-slate-200 font-mono text-[11px] focus:outline-none focus:border-brand-500"
+                />
+              </div>
             </div>
           )}
         </div>
