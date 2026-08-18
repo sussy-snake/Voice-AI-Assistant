@@ -1,0 +1,427 @@
+import { ChatMessage, LLMConfig, ToolCall } from '../types';
+import { getOpenAITools, getGeminiFunctionDeclarations, SYSTEM_TOOLS } from './toolsSchema';
+
+export interface LLMResponseChunk {
+  content?: string;
+  toolCalls?: ToolCall[];
+  isDone: boolean;
+}
+
+export class LLMClient {
+  private config: LLMConfig;
+
+  constructor(config: LLMConfig) {
+    this.config = config;
+  }
+
+  public updateConfig(newConfig: Partial<LLMConfig>) {
+    this.config = { ...this.config, ...newConfig };
+  }
+
+  /**
+   * Execute chat generation with streaming and tool-calling support
+   */
+  public async *streamChat(
+    messages: ChatMessage[],
+    signal?: AbortSignal
+  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    switch (this.config.provider) {
+      case 'ollama':
+        yield* this.streamOllama(messages, signal);
+        break;
+      case 'gemini':
+        yield* this.streamGemini(messages, signal);
+        break;
+      case 'openai':
+      case 'llamacpp':
+        yield* this.streamOpenAICompatible(messages, signal);
+        break;
+      case 'anthropic':
+        yield* this.streamAnthropic(messages, signal);
+        break;
+      default:
+        yield* this.streamOllama(messages, signal);
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Ollama Native Streamer (/api/chat)
+  // -------------------------------------------------------------
+  private async *streamOllama(
+    messages: ChatMessage[],
+    signal?: AbortSignal
+  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    const formattedMessages = [
+      { role: 'system', content: this.config.systemPrompt },
+      ...messages.map((m) => {
+        if (m.role === 'tool' && m.toolResults) {
+          return {
+            role: 'tool',
+            content: JSON.stringify(m.toolResults),
+          };
+        }
+        return {
+          role: m.role,
+          content: m.content,
+        };
+      }),
+    ];
+
+    const endpoint = `${this.config.ollamaUrl.replace(/\/$/, '')}/api/chat`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: this.config.ollamaModel,
+        messages: formattedMessages,
+        tools: getOpenAITools(),
+        stream: true,
+        options: {
+          temperature: this.config.temperature,
+        },
+      }),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`Ollama API Error (${response.status}): ${errorText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        try {
+          const json = JSON.parse(trimmed);
+          const toolCalls: ToolCall[] = [];
+
+          if (json.message?.tool_calls) {
+            for (const tc of json.message.tool_calls) {
+              toolCalls.push({
+                id: tc.id || 'call_' + Math.random().toString(36).substring(2, 9),
+                name: tc.function?.name || tc.name,
+                arguments: typeof tc.function?.arguments === 'string'
+                  ? JSON.parse(tc.function.arguments)
+                  : tc.function?.arguments || {},
+              });
+            }
+          }
+
+          yield {
+            content: json.message?.content || '',
+            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+            isDone: json.done || false,
+          };
+        } catch {
+          // Ignore partial parse
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Google Gemini API Streamer
+  // -------------------------------------------------------------
+  private async *streamGemini(
+    messages: ChatMessage[],
+    signal?: AbortSignal
+  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    const apiKey = this.config.geminiApiKey;
+    if (!apiKey) {
+      throw new Error('Gemini API key is not configured. Please set it in Settings.');
+    }
+
+    const model = this.config.geminiModel || 'gemini-2.0-flash';
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}`;
+
+    const contents = messages.map((m) => {
+      let role = m.role === 'assistant' ? 'model' : 'user';
+      const parts: any[] = [];
+
+      if (m.toolCalls && m.toolCalls.length > 0) {
+        for (const tc of m.toolCalls) {
+          parts.push({
+            functionCall: {
+              name: tc.name,
+              args: tc.arguments,
+            },
+          });
+        }
+      }
+
+      if (m.toolResults && m.toolResults.length > 0) {
+        role = 'user';
+        for (const tr of m.toolResults) {
+          parts.push({
+            functionResponse: {
+              name: tr.name,
+              response: { output: tr.result, error: tr.error },
+            },
+          });
+        }
+      }
+
+      if (m.content) {
+        parts.push({ text: m.content });
+      }
+
+      return { role, parts };
+    });
+
+    const bodyPayload = {
+      systemInstruction: {
+        parts: [{ text: this.config.systemPrompt }],
+      },
+      contents,
+      tools: getGeminiFunctionDeclarations(),
+      generationConfig: {
+        temperature: this.config.temperature,
+      },
+    };
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bodyPayload),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`Gemini API Error (${response.status}): ${errorText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const cleaned = buffer.trim();
+
+      // Gemini streams JSON array objects
+      try {
+        let jsonArray: any[] = [];
+        if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+          jsonArray = JSON.parse(cleaned);
+        } else if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+          jsonArray = [JSON.parse(cleaned)];
+        }
+
+        for (const item of jsonArray) {
+          const candidate = item.candidates?.[0];
+          const parts = candidate?.content?.parts || [];
+          let text = '';
+          const toolCalls: ToolCall[] = [];
+
+          for (const part of parts) {
+            if (part.text) text += part.text;
+            if (part.functionCall) {
+              toolCalls.push({
+                id: 'call_' + Math.random().toString(36).substring(2, 9),
+                name: part.functionCall.name,
+                arguments: part.functionCall.args || {},
+              });
+            }
+          }
+
+          yield {
+            content: text,
+            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+            isDone: candidate?.finishReason === 'STOP',
+          };
+        }
+      } catch {
+        // Continue buffering until valid JSON
+      }
+    }
+  }
+
+  // -------------------------------------------------------------
+  // OpenAI & Llama.cpp Compatible Streamer (/v1/chat/completions)
+  // -------------------------------------------------------------
+  private async *streamOpenAICompatible(
+    messages: ChatMessage[],
+    signal?: AbortSignal
+  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    const isLlamaCpp = this.config.provider === 'llamacpp';
+    const endpoint = isLlamaCpp
+      ? `${this.config.llamacppUrl.replace(/\/$/, '')}/v1/chat/completions`
+      : 'https://api.openai.com/v1/chat/completions';
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (!isLlamaCpp && this.config.openaiApiKey) {
+      headers['Authorization'] = `Bearer ${this.config.openaiApiKey}`;
+    }
+
+    const payload = {
+      model: isLlamaCpp ? 'default' : this.config.openaiModel,
+      messages: [
+        { role: 'system', content: this.config.systemPrompt },
+        ...messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      ],
+      tools: getOpenAITools(),
+      stream: true,
+      temperature: this.config.temperature,
+    };
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`OpenAI/Llama.cpp Error (${response.status}): ${errorText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const dataStr = trimmed.substring(6);
+        if (dataStr === '[DONE]') {
+          yield { isDone: true };
+          return;
+        }
+
+        try {
+          const json = JSON.parse(dataStr);
+          const delta = json.choices?.[0]?.delta;
+          const toolCalls: ToolCall[] = [];
+
+          if (delta?.tool_calls) {
+            for (const tc of delta.tool_calls) {
+              toolCalls.push({
+                id: tc.id || 'call_' + Math.random().toString(36).substring(2, 9),
+                name: tc.function?.name,
+                arguments: tc.function?.arguments ? JSON.parse(tc.function.arguments) : {},
+              });
+            }
+          }
+
+          yield {
+            content: delta?.content || '',
+            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+            isDone: false,
+          };
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Anthropic Claude Streamer (/v1/messages)
+  // -------------------------------------------------------------
+  private async *streamAnthropic(
+    messages: ChatMessage[],
+    signal?: AbortSignal
+  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    if (!this.config.anthropicApiKey) {
+      throw new Error('Anthropic API key is not configured.');
+    }
+
+    const endpoint = 'https://api.anthropic.com/v1/messages';
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'x-api-key': this.config.anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'dangerously-allow-browser': 'true',
+      },
+      body: JSON.stringify({
+        model: this.config.anthropicModel || 'claude-3-5-sonnet-20241022',
+        system: this.config.systemPrompt,
+        max_tokens: 4096,
+        messages: messages
+          .filter((m) => m.role !== 'system')
+          .map((m) => ({
+            role: m.role === 'assistant' ? 'assistant' : 'user',
+            content: m.content,
+          })),
+        tools: SYSTEM_TOOLS.map((t) => ({
+          name: t.name,
+          description: t.description,
+          input_schema: t.parameters,
+        })),
+        stream: true,
+      }),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`Anthropic API Error (${response.status}): ${errorText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        try {
+          const json = JSON.parse(trimmed.substring(6));
+          if (json.type === 'content_block_delta' && json.delta?.text) {
+            yield {
+              content: json.delta.text,
+              isDone: false,
+            };
+          }
+          if (json.type === 'message_stop') {
+            yield { isDone: true };
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+}

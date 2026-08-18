@@ -1,0 +1,245 @@
+import { useState, useRef, useCallback } from 'react';
+import { ChatMessage, LLMConfig, ToolCall, ToolResult } from '../types';
+import { LLMClient } from '../services/llmAdapters';
+import { TauriBridge } from '../services/tauriBridge';
+
+export function useAgentOrchestrator(config: LLMConfig) {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: "Hello! I'm your local-first Voice AI Assistant. You can speak to me or type commands like *\"find my invoices\"*, *\"schedule a meeting tomorrow at 3pm\"*, or *\"check system stats\"*.",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    },
+  ]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [activeToolRunning, setActiveToolRunning] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // -------------------------------------------------------------
+  // Tool Dispatcher
+  // -------------------------------------------------------------
+  const executeToolCall = async (toolCall: ToolCall): Promise<ToolResult> => {
+    setActiveToolRunning(toolCall.name);
+    console.info(`[Agent] Executing tool: ${toolCall.name}`, toolCall.arguments);
+
+    try {
+      let resultData: any;
+
+      switch (toolCall.name) {
+        case 'scan_filesystem': {
+          resultData = await TauriBridge.scanFilesystem({
+            query: toolCall.arguments.query,
+            path: toolCall.arguments.path,
+            extensions: toolCall.arguments.extensions,
+            max_results: toolCall.arguments.max_results || 30,
+          });
+          break;
+        }
+
+        case 'schedule_task': {
+          resultData = await TauriBridge.scheduleTask({
+            title: toolCall.arguments.title,
+            due_date: toolCall.arguments.due_date,
+            description: toolCall.arguments.description,
+            recurring: toolCall.arguments.recurring,
+            reminder_offset_mins: toolCall.arguments.reminder_offset_mins,
+          });
+          break;
+        }
+
+        case 'list_tasks': {
+          resultData = await TauriBridge.listTasks();
+          break;
+        }
+
+        case 'delete_task': {
+          resultData = await TauriBridge.deleteTask(toolCall.arguments.task_id);
+          break;
+        }
+
+        case 'system_status': {
+          resultData = await TauriBridge.getSystemStatus();
+          break;
+        }
+
+        case 'open_file_path': {
+          resultData = await TauriBridge.openFilePath(toolCall.arguments.path);
+          break;
+        }
+
+        case 'send_desktop_notification': {
+          resultData = await TauriBridge.sendNotification(
+            toolCall.arguments.title,
+            toolCall.arguments.body
+          );
+          break;
+        }
+
+        default:
+          throw new Error(`Unknown tool function: ${toolCall.name}`);
+      }
+
+      return {
+        toolCallId: toolCall.id,
+        name: toolCall.name,
+        result: resultData,
+      };
+    } catch (err: any) {
+      console.error(`Tool execution error [${toolCall.name}]:`, err);
+      return {
+        toolCallId: toolCall.id,
+        name: toolCall.name,
+        result: null,
+        error: err.message || 'Tool execution failed',
+      };
+    } finally {
+      setActiveToolRunning(null);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // Orchestrator Loop
+  // -------------------------------------------------------------
+  const sendMessage = useCallback(
+    async (userInput: string) => {
+      const trimmed = userInput.trim();
+      if (!trimmed || isProcessing) return;
+
+      const userMsgId = 'msg_' + Date.now();
+      const userMessage: ChatMessage = {
+        id: userMsgId,
+        role: 'user',
+        content: trimmed,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setMessages((prev) => [...prev, userMessage]);
+      setIsProcessing(true);
+
+      const client = new LLMClient(config);
+      abortControllerRef.current = new AbortController();
+
+      let currentHistory: ChatMessage[] = [...messages, userMessage];
+      let recursionDepth = 0;
+      const MAX_RECURSION = 5;
+
+      try {
+        while (recursionDepth < MAX_RECURSION) {
+          recursionDepth++;
+          const assistantMsgId = 'asst_' + Date.now() + '_' + recursionDepth;
+          let streamedText = '';
+          let detectedToolCalls: ToolCall[] = [];
+
+          // Add placeholder for streaming assistant response
+          const assistantMessage: ChatMessage = {
+            id: assistantMsgId,
+            role: 'assistant',
+            content: '',
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isStreaming: true,
+          };
+
+          setMessages((prev) => [...prev, assistantMessage]);
+
+          const stream = client.streamChat(currentHistory, abortControllerRef.current.signal);
+
+          for await (const chunk of stream) {
+            if (chunk.content) {
+              streamedText += chunk.content;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantMsgId ? { ...m, content: streamedText } : m))
+              );
+            }
+
+            if (chunk.toolCalls) {
+              detectedToolCalls = [...detectedToolCalls, ...chunk.toolCalls];
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId ? { ...m, toolCalls: detectedToolCalls } : m
+                )
+              );
+            }
+          }
+
+          // Finalize assistant message
+          const finalizedAsst: ChatMessage = {
+            ...assistantMessage,
+            content: streamedText,
+            toolCalls: detectedToolCalls.length > 0 ? detectedToolCalls : undefined,
+            isStreaming: false,
+          };
+
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantMsgId ? finalizedAsst : m))
+          );
+          currentHistory.push(finalizedAsst);
+
+          // If no tools requested, complete execution
+          if (detectedToolCalls.length === 0) {
+            break;
+          }
+
+          // Execute requested tools
+          const toolResults: ToolResult[] = [];
+          for (const tc of detectedToolCalls) {
+            const res = await executeToolCall(tc);
+            toolResults.push(res);
+          }
+
+          // Add tool result message to conversation history
+          const toolMsgId = 'tool_' + Date.now();
+          const toolMessage: ChatMessage = {
+            id: toolMsgId,
+            role: 'tool',
+            content: JSON.stringify(toolResults),
+            toolResults,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          };
+
+          setMessages((prev) => [...prev, toolMessage]);
+          currentHistory.push(toolMessage);
+
+          // Loop back to LLM to formulate final synthesis from tool results
+        }
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: 'err_' + Date.now(),
+              role: 'assistant',
+              content: `⚠️ **Error encountered:** ${err.message || 'Something went wrong while connecting to the LLM model.'}`,
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            },
+          ]);
+        }
+      } finally {
+        setIsProcessing(false);
+        setActiveToolRunning(null);
+      }
+    },
+    [messages, config, isProcessing]
+  );
+
+  const stopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setIsProcessing(false);
+      setActiveToolRunning(null);
+    }
+  }, []);
+
+  const clearChat = useCallback(() => {
+    setMessages([]);
+  }, []);
+
+  return {
+    messages,
+    isProcessing,
+    activeToolRunning,
+    sendMessage,
+    stopGeneration,
+    clearChat,
+  };
+}
