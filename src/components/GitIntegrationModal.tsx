@@ -44,6 +44,12 @@ export const GitIntegrationModal: React.FC<GitIntegrationModalProps> = ({
   };
 
   useEffect(() => {
+    if (githubToken) {
+      setToken(githubToken);
+    }
+  }, [githubToken, isOpen]);
+
+  useEffect(() => {
     if (isOpen) {
       loadGitInfo();
     }

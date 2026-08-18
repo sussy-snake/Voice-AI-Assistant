@@ -83,6 +83,12 @@ export const GoogleIntegrationModal: React.FC<GoogleIntegrationModalProps> = ({
   };
 
   useEffect(() => {
+    if (googleToken) {
+      setToken(googleToken);
+    }
+  }, [googleToken, isOpen]);
+
+  useEffect(() => {
     if (isOpen && token.trim()) {
       if (activeTab === 'inbox') loadInbox();
       if (activeTab === 'calendar') loadCalendarEvents();
