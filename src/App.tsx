@@ -7,10 +7,12 @@ import { ChatInterface } from './components/ChatInterface';
 import { TaskManagerModal } from './components/TaskManagerModal';
 import { FileExplorerModal } from './components/FileExplorerModal';
 import { SettingsModal } from './components/SettingsModal';
+import { GitIntegrationModal } from './components/GitIntegrationModal';
+import { GoogleIntegrationModal } from './components/GoogleIntegrationModal';
 import { isTauri } from './services/tauriBridge';
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
-  provider: 'ollama',
+  provider: 'gemini',
   ollamaUrl: 'http://localhost:11434',
   ollamaModel: 'llama3.1:latest',
   llamacppUrl: 'http://localhost:8080',
@@ -20,15 +22,19 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
   openaiModel: 'gpt-4o-mini',
   anthropicApiKey: '',
   anthropicModel: 'claude-3-5-sonnet-20241022',
+  githubToken: '',
+  googleAccessToken: '',
   systemPrompt:
-    'You are a high-performance local Voice AI Assistant styled after G-Helper. You have access to local system tools:\n' +
-    '- `scan_filesystem`: To locate user files, documents, codebases, and media.\n' +
-    '- `schedule_task`: To schedule reminders, calendar events, or recurring tasks.\n' +
-    '- `list_tasks`: To query existing scheduled tasks.\n' +
-    '- `system_status`: To inspect live CPU load, RAM usage, and disk partitions.\n' +
-    '- `open_file_path`: To open files or folders in the system file manager.\n' +
-    '- `send_desktop_notification`: To trigger OS notifications.\n\n' +
-    'Be concise, helpful, and execute appropriate tools directly when requested by the user.',
+    'You are a high-performance local AI Companion and Computer Science Assistant styled after G-Helper.\n' +
+    'You have direct access to local system tools and cloud integrations:\n' +
+    '- `git_create_repo` & `git_commit_and_push`: To manage GitHub repositories, stage, commit, and push code.\n' +
+    '- `gmail_send_message`: To send emails via Gmail.\n' +
+    '- `calendar_add_event`: To mark deadlines and exams on Google Calendar.\n' +
+    '- `scan_filesystem`: To locate user files, documents, codebases, and notes.\n' +
+    '- `schedule_task`: To schedule local reminders with desktop notifications in SQLite.\n' +
+    '- `run_hardware_compute`: To run parallel offline compute utilizing full CPU cores and NPU DirectML.\n' +
+    '- `system_status`: To inspect live CPU load, RAM usage, and disk storage.\n\n' +
+    'Be concise, intelligent, and execute appropriate tools directly when requested by the user.',
   temperature: 0.7,
 };
 
@@ -43,7 +49,6 @@ const DEFAULT_AUDIO_SETTINGS: AudioSettings = {
 };
 
 export function App() {
-  // Load persistent configurations
   const [config, setConfig] = useState<LLMConfig>(() => {
     try {
       const saved = localStorage.getItem('voice_ai_llm_config');
@@ -62,10 +67,12 @@ export function App() {
     }
   });
 
-  // Modals state
+  // Modal dialog states
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(false);
   const [isTaskManagerOpen, setIsTaskManagerOpen] = useState(false);
+  const [isGitModalOpen, setIsGitModalOpen] = useState(false);
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
 
   // Initialize Agent Orchestrator
   const {
@@ -77,7 +84,7 @@ export function App() {
     clearChat,
   } = useAgentOrchestrator(config);
 
-  // Audio Callback when user completes speech
+  // Voice callback
   const handleTranscriptionComplete = useCallback(
     (transcript: string) => {
       if (transcript.trim()) {
@@ -97,7 +104,6 @@ export function App() {
     onTranscriptionComplete: handleTranscriptionComplete,
   });
 
-  // Save changes to local storage
   const handleSaveConfig = (newConfig: LLMConfig) => {
     setConfig(newConfig);
     localStorage.setItem('voice_ai_llm_config', JSON.stringify(newConfig));
@@ -108,6 +114,18 @@ export function App() {
     localStorage.setItem('voice_ai_audio_settings', JSON.stringify(newAudio));
   };
 
+  const handleSaveGitHubToken = (token: string) => {
+    const updated = { ...config, githubToken: token };
+    setConfig(updated);
+    localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
+  };
+
+  const handleSaveGoogleToken = (token: string) => {
+    const updated = { ...config, googleAccessToken: token };
+    setConfig(updated);
+    localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
+  };
+
   const toggleVoiceMode = () => {
     const nextMode: VoiceMode = audioSettings.voiceMode === 'push-to-talk' ? 'voice-activated' : 'push-to-talk';
     const updated: AudioSettings = { ...audioSettings, voiceMode: nextMode };
@@ -115,7 +133,7 @@ export function App() {
     localStorage.setItem('voice_ai_audio_settings', JSON.stringify(updated));
   };
 
-  // Setup Tauri desktop event listeners
+  // Setup Tauri desktop event listeners & Global Shortcuts
   useEffect(() => {
     if (isTauri()) {
       import('@tauri-apps/api/event').then(({ listen }) => {
@@ -139,6 +157,8 @@ export function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenFileExplorer={() => setIsFileExplorerOpen(true)}
         onOpenTaskManager={() => setIsTaskManagerOpen(true)}
+        onOpenGitModal={() => setIsGitModalOpen(true)}
+        onOpenGoogleModal={() => setIsGoogleModalOpen(true)}
         onToggleVoiceMode={toggleVoiceMode}
       />
 
@@ -169,6 +189,20 @@ export function App() {
         audioSettings={audioSettings}
         onSaveConfig={handleSaveConfig}
         onSaveAudioSettings={handleSaveAudioSettings}
+      />
+
+      <GitIntegrationModal
+        isOpen={isGitModalOpen}
+        onClose={() => setIsGitModalOpen(false)}
+        githubToken={config.githubToken}
+        onSaveToken={handleSaveGitHubToken}
+      />
+
+      <GoogleIntegrationModal
+        isOpen={isGoogleModalOpen}
+        onClose={() => setIsGoogleModalOpen(false)}
+        googleToken={config.googleAccessToken}
+        onSaveToken={handleSaveGoogleToken}
       />
 
       <FileExplorerModal

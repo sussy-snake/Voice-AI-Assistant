@@ -29,8 +29,21 @@ pub fn run() {
             commands::scheduler::delete_task,
             commands::scheduler::send_desktop_notification,
 
-            // Hardware Telemetry
+            // Hardware Telemetry & NPU Compute
             commands::system::system_status,
+            commands::hardware_compute::get_hardware_compute_profile,
+            commands::hardware_compute::run_hardware_compute,
+
+            // Git & GitHub Automation
+            commands::git::git_status_check,
+            commands::git::git_commit_and_push,
+            commands::git::git_create_repo,
+            commands::git::git_list_user_repos,
+
+            // Google Suite (Gmail & Google Calendar)
+            commands::google::gmail_send_message,
+            commands::google::calendar_add_event,
+            commands::google::calendar_list_events,
 
             // Audio & VAD
             commands::audio::check_whisper_server,

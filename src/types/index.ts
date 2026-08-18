@@ -49,6 +49,65 @@ export interface SystemStatus {
   disks: DiskMetric[];
 }
 
+export interface HardwareComputeProfile {
+  cpu_cores_logical: number;
+  cpu_cores_physical?: number | null;
+  cpu_brand: string;
+  avx2_supported: boolean;
+  npu_detected: boolean;
+  npu_type: string;
+  directml_gpu_detected: boolean;
+  max_compute_threads: number;
+  compute_mode: string;
+}
+
+export interface ComputeTaskResult {
+  task_name: string;
+  elapsed_ms: number;
+  threads_used: number;
+  hardware_backend: string;
+  result_summary: string;
+}
+
+export interface GitStatusResult {
+  is_repo: boolean;
+  current_branch: string;
+  status_text: string;
+  modified_files: string[];
+  untracked_files: string[];
+  clean: boolean;
+}
+
+export interface GitHubRepo {
+  name: string;
+  html_url: string;
+  clone_url: string;
+  private: boolean;
+  description?: string | null;
+}
+
+export interface GitOperationResult {
+  success: boolean;
+  message: string;
+  output?: string | null;
+  repo_url?: string | null;
+}
+
+export interface CalendarEventItem {
+  id: string;
+  summary: string;
+  start_time: string;
+  end_time: string;
+  description?: string | null;
+  html_link?: string | null;
+}
+
+export interface GoogleOperationResult {
+  success: boolean;
+  message: string;
+  details?: string | null;
+}
+
 export interface LLMConfig {
   provider: LLMProvider;
   ollamaUrl: string;
@@ -62,6 +121,8 @@ export interface LLMConfig {
   anthropicModel: string;
   systemPrompt: string;
   temperature: number;
+  githubToken?: string;
+  googleAccessToken?: string;
 }
 
 export interface ToolCall {
@@ -89,8 +150,8 @@ export interface ChatMessage {
 
 export interface AudioSettings {
   voiceMode: VoiceMode;
-  vadSensitivity: number; // 0.005 to 0.08
-  pushToTalkKey: string; // e.g. "Space"
+  vadSensitivity: number;
+  pushToTalkKey: string;
   whisperEndpoint: string;
   useWebSpeechFallback: boolean;
   smartPunctuation: boolean;
@@ -100,7 +161,7 @@ export interface AudioSettings {
 export interface AudioState {
   isListening: boolean;
   isSpeaking: boolean;
-  volume: number; // 0.0 to 1.0
+  volume: number;
   interimTranscript: string;
   finalTranscript: string;
   error: string | null;

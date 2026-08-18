@@ -26,12 +26,12 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
         },
         path: {
           type: 'string',
-          description: 'Starting folder directory path. If omitted or empty, searches from the user home directory.',
+          description: 'Starting folder directory path. If omitted or empty, searches from current or home directory.',
         },
         extensions: {
           type: 'array',
           items: { type: 'string' },
-          description: 'List of file extensions to filter by without dot (e.g. ["pdf", "docx", "rs", "json"]).',
+          description: 'List of file extensions to filter by without dot (e.g. ["pdf", "docx", "rs", "cpp", "java", "py"]).',
         },
         max_results: {
           type: 'number',
@@ -53,7 +53,7 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
         },
         due_date: {
           type: 'string',
-          description: 'Due date/time in ISO-8601 string format (e.g. "2026-08-19T14:30:00Z" or "2026-08-20T09:00:00").',
+          description: 'Due date/time in ISO-8601 string format (e.g. "2026-08-19T14:30:00Z").',
         },
         description: {
           type: 'string',
@@ -66,7 +66,7 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
         },
         reminder_offset_mins: {
           type: 'number',
-          description: 'Minutes before due_date to trigger the desktop reminder notification (e.g. 10).',
+          description: 'Minutes before due_date to trigger the desktop reminder notification.',
         },
       },
       required: ['title', 'due_date'],
@@ -82,22 +82,8 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: 'delete_task',
-    description: 'Deletes a scheduled task by its unique ID.',
-    parameters: {
-      type: 'object',
-      properties: {
-        task_id: {
-          type: 'string',
-          description: 'The unique UUID of the task to delete.',
-        },
-      },
-      required: ['task_id'],
-    },
-  },
-  {
     name: 'system_status',
-    description: 'Retrieves real-time OS hardware telemetry including CPU utilization %, RAM usage, swap space, disk partition storage, and system uptime.',
+    description: 'Retrieves real-time OS hardware telemetry including CPU utilization %, RAM usage, swap space, and disk partitions.',
     parameters: {
       type: 'object',
       properties: {},
@@ -105,42 +91,138 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: 'open_file_path',
-    description: 'Opens a local file or folder directory in the default system file manager or application (Windows Explorer, macOS Finder, Linux xdg-open).',
+    name: 'git_status_check',
+    description: 'Inspects the git status of a local project directory (modified files, untracked files, branch).',
     parameters: {
       type: 'object',
       properties: {
-        path: {
+        folder_path: {
           type: 'string',
-          description: 'Absolute or relative file/directory path to open.',
+          description: 'Path of the local repository directory. Defaults to current directory.',
         },
       },
-      required: ['path'],
+      required: [],
     },
   },
   {
-    name: 'send_desktop_notification',
-    description: 'Pushes an immediate native desktop notification banner with a custom title and message body.',
+    name: 'git_commit_and_push',
+    description: 'Stages all project code (git add .), creates a commit with an informative commit message, and pushes to remote GitHub repository.',
+    parameters: {
+      type: 'object',
+      properties: {
+        folder_path: {
+          type: 'string',
+          description: 'Local repository folder path. Defaults to current directory.',
+        },
+        commit_message: {
+          type: 'string',
+          description: 'Descriptive commit message summarizing code changes.',
+        },
+        branch: {
+          type: 'string',
+          description: 'Target git branch to push to (defaults to "main").',
+        },
+      },
+      required: ['commit_message'],
+    },
+  },
+  {
+    name: 'git_create_repo',
+    description: 'Creates a new remote repository on GitHub via API, links the local folder, and pushes the initial code commit.',
+    parameters: {
+      type: 'object',
+      properties: {
+        repo_name: {
+          type: 'string',
+          description: 'Name of the repository to create on GitHub.',
+        },
+        is_private: {
+          type: 'boolean',
+          description: 'Whether the GitHub repo should be private (true) or public (false).',
+        },
+        description: {
+          type: 'string',
+          description: 'Repository description.',
+        },
+        local_folder_path: {
+          type: 'string',
+          description: 'Path of the local project directory to link and push.',
+        },
+      },
+      required: ['repo_name'],
+    },
+  },
+  {
+    name: 'gmail_send_message',
+    description: 'Sends an email from your connected Gmail account to specified recipients.',
+    parameters: {
+      type: 'object',
+      properties: {
+        to: {
+          type: 'string',
+          description: 'Recipient email address (e.g. professor@university.edu).',
+        },
+        subject: {
+          type: 'string',
+          description: 'Email subject line.',
+        },
+        body: {
+          type: 'string',
+          description: 'Body text content of the email.',
+        },
+      },
+      required: ['to', 'subject', 'body'],
+    },
+  },
+  {
+    name: 'calendar_add_event',
+    description: 'Marks an important date, exam, submission deadline, or study block directly on your Google Calendar.',
     parameters: {
       type: 'object',
       properties: {
         title: {
           type: 'string',
-          description: 'Notification title header.',
+          description: 'Event title (e.g. "Data Structures Exam", "OS Lab Submission").',
         },
-        body: {
+        start_time: {
           type: 'string',
-          description: 'Notification message body.',
+          description: 'Start date/time in ISO-8601 format (e.g. "2026-08-20T10:00:00Z").',
+        },
+        end_time: {
+          type: 'string',
+          description: 'End date/time in ISO-8601 format.',
+        },
+        description: {
+          type: 'string',
+          description: 'Additional notes or syllabus topics for the calendar event.',
         },
       },
-      required: ['title', 'body'],
+      required: ['title', 'start_time', 'end_time'],
+    },
+  },
+  {
+    name: 'run_hardware_compute',
+    description: 'Executes heavy offline compute tasks utilizing 100% of CPU cores, AVX2 SIMD, and NPU neural acceleration.',
+    parameters: {
+      type: 'object',
+      properties: {
+        task_type: {
+          type: 'string',
+          enum: ['prime_sieve', 'matrix_dot_product', 'vector_benchmark'],
+          description: 'Type of parallel compute task to execute.',
+        },
+        dataset_size: {
+          type: 'number',
+          description: 'Dataset size or computation iterations.',
+        },
+      },
+      required: ['task_type'],
     },
   },
 ];
 
-// Convert to OpenAI / Ollama tools format
 export function getOpenAITools() {
-  return SYSTEM_TOOLS.map(t => ({
+  return SYSTEM_TOOLS.map((t) => ({
     type: 'function',
     function: {
       name: t.name,
@@ -150,18 +232,17 @@ export function getOpenAITools() {
   }));
 }
 
-// Convert to Gemini FunctionDeclarations format
 export function getGeminiFunctionDeclarations() {
   return [
     {
-      functionDeclarations: SYSTEM_TOOLS.map(t => ({
+      functionDeclarations: SYSTEM_TOOLS.map((t) => ({
         name: t.name,
         description: t.description,
         parameters: {
           type: 'OBJECT',
           properties: Object.entries(t.parameters.properties).reduce((acc, [key, prop]) => {
             acc[key] = {
-              type: prop.type.toUpperCase(),
+              type: prop.type === 'array' ? 'ARRAY' : prop.type.toUpperCase(),
               description: prop.description,
               ...(prop.enum ? { enum: prop.enum } : {}),
             };

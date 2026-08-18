@@ -8,7 +8,8 @@ export function useAgentOrchestrator(config: LLMConfig) {
     {
       id: 'welcome',
       role: 'assistant',
-      content: "Hello! I'm your local-first Voice AI Assistant. You can speak to me or type commands like *\"find my invoices\"*, *\"schedule a meeting tomorrow at 3pm\"*, or *\"check system stats\"*.",
+      content:
+        "Hello Harsh! I'm your native desktop **AI Companion & CS Assistant**.\n\nI'm running locally in the background. You can speak or type to me to:\n- 🐙 **Git & GitHub:** *\"Create a repo named os-lab and push code\"* or *\"Git status\"*\n- ✉️ **Gmail:** *\"Send email to professor@college.edu regarding my assignment\"*\n- 📅 **Google Calendar:** *\"Mark DSA midterm on my Google Calendar for Friday\"*\n- ⚡ **Offline NPU/CPU Compute:** *\"Run hardware compute benchmark\"*\n- 🔍 **Filesystem:** *\"Find my DBMS pdf notes\"*",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -76,6 +77,71 @@ export function useAgentOrchestrator(config: LLMConfig) {
           break;
         }
 
+        // Git & GitHub
+        case 'git_status_check': {
+          resultData = await TauriBridge.gitStatusCheck(toolCall.arguments.folder_path);
+          break;
+        }
+
+        case 'git_commit_and_push': {
+          resultData = await TauriBridge.gitCommitAndPush({
+            folder_path: toolCall.arguments.folder_path,
+            commit_message: toolCall.arguments.commit_message,
+            branch: toolCall.arguments.branch,
+          });
+          break;
+        }
+
+        case 'git_create_repo': {
+          resultData = await TauriBridge.gitCreateRepo({
+            github_token: config.githubToken || '',
+            repo_name: toolCall.arguments.repo_name,
+            is_private: toolCall.arguments.is_private,
+            description: toolCall.arguments.description,
+            local_folder_path: toolCall.arguments.local_folder_path,
+          });
+          break;
+        }
+
+        // Gmail & Google Calendar
+        case 'gmail_send_message': {
+          resultData = await TauriBridge.gmailSendMessage({
+            access_token: config.googleAccessToken || '',
+            to: toolCall.arguments.to,
+            subject: toolCall.arguments.subject,
+            body: toolCall.arguments.body,
+          });
+          break;
+        }
+
+        case 'calendar_add_event': {
+          resultData = await TauriBridge.calendarAddEvent({
+            access_token: config.googleAccessToken || '',
+            title: toolCall.arguments.title,
+            start_time: toolCall.arguments.start_time,
+            end_time: toolCall.arguments.end_time,
+            description: toolCall.arguments.description,
+          });
+          break;
+        }
+
+        case 'calendar_list_events': {
+          resultData = await TauriBridge.calendarListEvents(
+            config.googleAccessToken || '',
+            toolCall.arguments.max_results
+          );
+          break;
+        }
+
+        // Hardware Compute Acceleration
+        case 'run_hardware_compute': {
+          resultData = await TauriBridge.runHardwareCompute(
+            toolCall.arguments.task_type,
+            toolCall.arguments.dataset_size
+          );
+          break;
+        }
+
         default:
           throw new Error(`Unknown tool function: ${toolCall.name}`);
       }
@@ -120,7 +186,7 @@ export function useAgentOrchestrator(config: LLMConfig) {
       const client = new LLMClient(config);
       abortControllerRef.current = new AbortController();
 
-      let currentHistory: ChatMessage[] = [...messages, userMessage];
+      const currentHistory: ChatMessage[] = [...messages, userMessage];
       let recursionDepth = 0;
       const MAX_RECURSION = 5;
 
@@ -131,7 +197,6 @@ export function useAgentOrchestrator(config: LLMConfig) {
           let streamedText = '';
           let detectedToolCalls: ToolCall[] = [];
 
-          // Add placeholder for streaming assistant response
           const assistantMessage: ChatMessage = {
             id: assistantMsgId,
             role: 'assistant',
@@ -162,7 +227,6 @@ export function useAgentOrchestrator(config: LLMConfig) {
             }
           }
 
-          // Finalize assistant message
           const finalizedAsst: ChatMessage = {
             ...assistantMessage,
             content: streamedText,
@@ -175,19 +239,16 @@ export function useAgentOrchestrator(config: LLMConfig) {
           );
           currentHistory.push(finalizedAsst);
 
-          // If no tools requested, complete execution
           if (detectedToolCalls.length === 0) {
             break;
           }
 
-          // Execute requested tools
           const toolResults: ToolResult[] = [];
           for (const tc of detectedToolCalls) {
             const res = await executeToolCall(tc);
             toolResults.push(res);
           }
 
-          // Add tool result message to conversation history
           const toolMsgId = 'tool_' + Date.now();
           const toolMessage: ChatMessage = {
             id: toolMsgId,
@@ -199,8 +260,6 @@ export function useAgentOrchestrator(config: LLMConfig) {
 
           setMessages((prev) => [...prev, toolMessage]);
           currentHistory.push(toolMessage);
-
-          // Loop back to LLM to formulate final synthesis from tool results
         }
       } catch (err: any) {
         if (err.name !== 'AbortError') {
@@ -209,7 +268,7 @@ export function useAgentOrchestrator(config: LLMConfig) {
             {
               id: 'err_' + Date.now(),
               role: 'assistant',
-              content: `⚠️ **Error encountered:** ${err.message || 'Something went wrong while connecting to the LLM model.'}`,
+              content: `⚠️ **Notice:** ${err.message || 'Error occurred while processing request.'}`,
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             },
           ]);

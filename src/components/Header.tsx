@@ -1,6 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Cpu, HardDrive, Settings, FolderSearch, CalendarCheck, Mic, Radio, Zap } from 'lucide-react';
-import { SystemStatus, LLMConfig, VoiceMode } from '../types';
+import {
+  Cpu,
+  HardDrive,
+  Settings,
+  FolderSearch,
+  CalendarCheck,
+  Mic,
+  Radio,
+  Zap,
+  GitBranch,
+  Mail,
+  Activity,
+} from 'lucide-react';
+import { SystemStatus, LLMConfig, VoiceMode, HardwareComputeProfile } from '../types';
 import { TauriBridge } from '../services/tauriBridge';
 
 interface HeaderProps {
@@ -10,6 +22,8 @@ interface HeaderProps {
   onOpenSettings: () => void;
   onOpenFileExplorer: () => void;
   onOpenTaskManager: () => void;
+  onOpenGitModal: () => void;
+  onOpenGoogleModal: () => void;
   onToggleVoiceMode: () => void;
 }
 
@@ -20,9 +34,12 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
   onOpenFileExplorer,
   onOpenTaskManager,
+  onOpenGitModal,
+  onOpenGoogleModal,
   onToggleVoiceMode,
 }) => {
   const [stats, setStats] = useState<SystemStatus | null>(null);
+  const [computeProfile, setComputeProfile] = useState<HardwareComputeProfile | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -34,7 +51,17 @@ export const Header: React.FC<HeaderProps> = ({
       }
     };
 
+    const fetchCompute = async () => {
+      try {
+        const comp = await TauriBridge.getHardwareComputeProfile();
+        setComputeProfile(comp);
+      } catch {
+        // ignore
+      }
+    };
+
     fetchStats();
+    fetchCompute();
     const interval = setInterval(fetchStats, 3000);
     return () => clearInterval(interval);
   }, []);
@@ -53,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="flex items-center justify-between px-3.5 py-2.5 bg-surface/90 backdrop-blur-md border-b border-surfaceBorder select-none">
-      {/* Brand & Mode Pill */}
+      {/* Brand & NPU Compute Pill */}
       <div className="flex items-center space-x-2">
         <div className="flex items-center space-x-1.5 font-bold tracking-tight text-white">
           <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-brand-600 to-accent-cyan flex items-center justify-center shadow-sm shadow-brand-500/20">
@@ -62,14 +89,22 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="text-sm font-semibold tracking-wide">VoiceAI</span>
         </div>
 
-        {/* Active Model Pill */}
-        <div className="hidden sm:flex items-center px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-300">
+        {/* Model Badge */}
+        <div className="hidden sm:flex items-center px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-300">
           <span className="w-1.5 h-1.5 rounded-full bg-brand-500 mr-1.5 animate-pulse"></span>
-          <span className="capitalize">{config.provider}</span>:
-          <span className="text-slate-400 ml-1 truncate max-w-[90px]">
-            {config.provider === 'ollama' ? config.ollamaModel : config.geminiModel}
-          </span>
+          <span className="capitalize">{config.provider}</span>
         </div>
+
+        {/* NPU / Hardware Acceleration Pill */}
+        {computeProfile && (
+          <div
+            className="hidden md:flex items-center px-2 py-0.5 rounded-full bg-slate-900 border border-brand-800/40 text-[10px] font-mono text-brand-300"
+            title={computeProfile.compute_mode}
+          >
+            <Activity className="w-3 h-3 text-accent-cyan mr-1 animate-pulse" />
+            <span>{computeProfile.npu_detected ? 'NPU Ready' : 'DirectML Accelerated'}</span>
+          </div>
+        )}
       </div>
 
       {/* Center Telemetry (G-Helper Style) */}
@@ -130,22 +165,43 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Action Buttons */}
       <div className="flex items-center space-x-1">
+        {/* GitHub Automation Button */}
+        <button
+          onClick={onOpenGitModal}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-cyan hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all"
+          title="Git & GitHub Hub (Create & Push Code)"
+        >
+          <GitBranch className="w-4 h-4" />
+        </button>
+
+        {/* Google Suite Button */}
+        <button
+          onClick={onOpenGoogleModal}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-rose hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all"
+          title="Google Suite (Gmail & Calendar)"
+        >
+          <Mail className="w-4 h-4" />
+        </button>
+
+        {/* Filesystem Scanner */}
         <button
           onClick={onOpenFileExplorer}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all"
-          title="Open Filesystem Scanner (Tool)"
+          title="Filesystem Scanner"
         >
           <FolderSearch className="w-4 h-4" />
         </button>
 
+        {/* SQLite Task Scheduler */}
         <button
           onClick={onOpenTaskManager}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all"
-          title="Open Scheduled Tasks (SQLite)"
+          title="SQLite Task Scheduler"
         >
           <CalendarCheck className="w-4 h-4" />
         </button>
 
+        {/* Settings */}
         <button
           onClick={onOpenSettings}
           className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all"

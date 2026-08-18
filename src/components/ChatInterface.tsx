@@ -14,13 +14,14 @@ import {
   Trash2,
   Copy,
   Check,
-  BookOpen,
   Code2,
-  Cpu,
-  Database,
   Search,
+  GitBranch,
+  Mail,
+  Zap,
+  ExternalLink,
 } from 'lucide-react';
-import { ChatMessage, ToolResult, FileMatch, SystemStatus, Task } from '../types';
+import { ChatMessage, ToolResult, FileMatch, SystemStatus, Task, GitOperationResult, GoogleOperationResult, ComputeTaskResult, GitStatusResult } from '../types';
 import { AudioVisualizer } from './AudioVisualizer';
 import { TauriBridge } from '../services/tauriBridge';
 
@@ -218,6 +219,99 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       );
     }
 
+    if (tr.name === 'git_commit_and_push' || tr.name === 'git_create_repo') {
+      const gitRes: GitOperationResult = tr.result;
+      return (
+        <div key={tr.toolCallId} className="my-2 p-3 rounded-lg bg-surface/95 border border-accent-cyan/40 text-xs space-y-1.5">
+          <div className="flex items-center space-x-1.5 text-accent-cyan font-semibold">
+            <GitBranch className="w-4 h-4" />
+            <span>Git Operation Completed</span>
+          </div>
+          <p className="text-slate-200">{gitRes?.message}</p>
+          {gitRes?.repo_url && (
+            <a
+              href={gitRes.repo_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center space-x-1 text-accent-cyan hover:underline text-[11px]"
+            >
+              <span>Open on GitHub</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
+        </div>
+      );
+    }
+
+    if (tr.name === 'git_status_check') {
+      const status: GitStatusResult = tr.result;
+      return (
+        <div key={tr.toolCallId} className="my-2 p-3 rounded-lg bg-surface/95 border border-slate-800 text-xs space-y-1">
+          <div className="flex items-center justify-between font-semibold text-slate-200">
+            <span className="flex items-center space-x-1.5 text-accent-cyan">
+              <GitBranch className="w-3.5 h-3.5" />
+              <span>Git Status ({status.current_branch})</span>
+            </span>
+            <span className={status.clean ? 'text-accent-emerald' : 'text-accent-amber'}>
+              {status.clean ? 'Clean' : 'Modified'}
+            </span>
+          </div>
+          {status.modified_files.length > 0 && (
+            <div className="text-[11px] font-mono text-slate-400 bg-slate-950 p-2 rounded max-h-24 overflow-y-auto">
+              {status.modified_files.map((f, i) => (
+                <div key={i} className="text-amber-300">✎ {f}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (tr.name === 'gmail_send_message') {
+      const gRes: GoogleOperationResult = tr.result;
+      return (
+        <div key={tr.toolCallId} className="my-2 p-3 rounded-lg bg-surface/95 border border-accent-rose/40 text-xs space-y-1">
+          <div className="flex items-center space-x-1.5 text-accent-rose font-semibold">
+            <Mail className="w-4 h-4" />
+            <span>Gmail Sent</span>
+          </div>
+          <p className="text-slate-200">{gRes?.message}</p>
+          {gRes?.details && <p className="text-slate-400 text-[11px]">{gRes.details}</p>}
+        </div>
+      );
+    }
+
+    if (tr.name === 'calendar_add_event') {
+      const gRes: GoogleOperationResult = tr.result;
+      return (
+        <div key={tr.toolCallId} className="my-2 p-3 rounded-lg bg-surface/95 border border-accent-emerald/40 text-xs space-y-1">
+          <div className="flex items-center space-x-1.5 text-accent-emerald font-semibold">
+            <Calendar className="w-4 h-4" />
+            <span>Google Calendar Updated</span>
+          </div>
+          <p className="text-slate-200">{gRes?.message}</p>
+        </div>
+      );
+    }
+
+    if (tr.name === 'run_hardware_compute') {
+      const compRes: ComputeTaskResult = tr.result;
+      return (
+        <div key={tr.toolCallId} className="my-2 p-3 rounded-lg bg-surface/95 border border-brand-500/40 text-xs space-y-1.5">
+          <div className="flex items-center justify-between font-semibold text-brand-300">
+            <span className="flex items-center space-x-1.5 text-accent-cyan">
+              <Zap className="w-4 h-4" />
+              <span>NPU / CPU Hardware Compute ({compRes?.elapsed_ms}ms)</span>
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-brand-950 text-brand-300">
+              {compRes?.threads_used} Parallel Threads
+            </span>
+          </div>
+          <p className="text-slate-200">{compRes?.result_summary}</p>
+        </div>
+      );
+    }
+
     if (tr.name === 'schedule_task') {
       const task: Task = tr.result?.task;
       return (
@@ -234,11 +328,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   <Clock className="w-3 h-3 text-slate-400" />
                   <span>{new Date(task.due_date).toLocaleString()}</span>
                 </span>
-                {task.recurring && task.recurring !== 'none' && (
-                  <span className="px-1.5 py-0.5 rounded bg-brand-950 text-brand-300 border border-brand-800">
-                    {task.recurring}
-                  </span>
-                )}
               </div>
             </div>
           ) : (
@@ -282,11 +371,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   const csQuickPrompts = [
-    { label: "📅 Today's Date", query: "What is today's exact date and time?", icon: Calendar },
-    { label: '🚀 DSA Complexity', query: 'Show me the Big-O time complexity cheatsheet for sorting and tree data structures with examples.', icon: Code2 },
-    { label: '🖥️ OS Deadlocks', query: 'Explain the 4 Coffman conditions for deadlocks in Operating Systems with avoidance strategies.', icon: Cpu },
-    { label: '💾 DBMS ACID', query: 'Explain ACID properties and 1NF/2NF/3NF Normalization in DBMS.', icon: Database },
-    { label: '⏰ Schedule Study', query: 'Schedule DSA revision session tomorrow at 4pm.', icon: BookOpen },
+    { label: '🐙 Push to GitHub', query: 'Push my code changes to GitHub repository.', icon: GitBranch },
+    { label: '📅 Mark on Calendar', query: 'Mark OS Lab assignment on my Google Calendar for Friday at 5pm.', icon: Calendar },
+    { label: '✉️ Send Email', query: 'Send email to professor@college.edu with subject "Lab Assignment 4" and body "Hello, here is my completed assignment."', icon: Mail },
+    { label: '⚡ NPU Compute', query: 'Run hardware compute benchmark with full CPU and NPU acceleration.', icon: Zap },
+    { label: '🚀 DSA Complexity', query: 'Show me the Big-O time complexity cheatsheet for sorting and trees.', icon: Code2 },
     { label: '🔍 Find Notes', query: 'Find my notes and pdf files on this computer.', icon: Search },
   ];
 
@@ -438,7 +527,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               isListening
                 ? 'Listening to speech...'
                 : voiceMode === 'push-to-talk'
-                ? 'Hold Space or Mic to speak, or type coding/study questions...'
+                ? 'Hold Space/Mic to speak, or type git/calendar/coding commands...'
                 : 'Type or speak naturally...'
             }
             disabled={isProcessing}
