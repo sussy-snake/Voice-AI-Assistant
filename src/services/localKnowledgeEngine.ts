@@ -157,15 +157,20 @@ export class LocalKnowledgeEngine {
       let subject = 'Important Message';
       let body = '';
 
-      // 1. Family Detection
-      const isFamily =
-        query.includes('son') ||
-        query.includes('mom') ||
-        query.includes('mother') ||
+      // 1. Family Detection (Mom, Papa, Dad, Mother, Father)
+      const isPapa =
+        query.includes('papa') ||
         query.includes('dad') ||
         query.includes('father') ||
-        query.includes('sister') ||
-        query.includes('brother');
+        query.includes('daddy');
+
+      const isMom =
+        query.includes('mom') ||
+        query.includes('mother') ||
+        query.includes('mummy') ||
+        query.includes('maa');
+
+      const isFamily = isPapa || isMom || query.includes('son') || query.includes('sister') || query.includes('brother');
 
       // 2. Friend / Buddy / Casual Detection
       const isFriend =
@@ -175,13 +180,15 @@ export class LocalKnowledgeEngine {
         query.includes('pal') ||
         query.includes('dude');
 
-      if (isFamily) {
+      if (isPapa) {
         subject = 'Exciting News! Message from your son (Automated AI Bot)';
-        if (query.includes('bot') || query.includes('automated') || query.includes('created')) {
-          body = `Hi Mom,\n\nI hope you are doing wonderful! I wanted to share something really exciting with you—your son has created an automated AI assistant and I am sending this email directly through it right now!\n\nEverything is working smoothly and I wanted you to be the very first person to test it out with me.\n\nWith lots of love,\nYour Son (${senderName})`;
-        } else {
-          body = `Hi Mom,\n\nI hope you are doing great! Just wanted to send you a quick note from my automated assistant.\n\nLove you,\n${senderName}`;
-        }
+        body = `Dear Papa,\n\nI hope you are doing well! I wanted to share something really exciting with you—your son has created an automated AI assistant and I am sending this email directly through it right now!\n\nEverything is working smoothly and I wanted you to see what I built.\n\nWith lots of love and respect,\nYour Son (${senderName})`;
+      } else if (isMom) {
+        subject = 'Exciting News! Message from your son (Automated AI Bot)';
+        body = `Dear Mom,\n\nI hope you are doing wonderful! I wanted to share something really exciting with you—your son has created an automated AI assistant and I am sending this email directly through it right now!\n\nEverything is working smoothly and I wanted you to be the first one to test it out with me.\n\nWith lots of love,\nYour Son (${senderName})`;
+      } else if (isFamily) {
+        subject = 'Message from your son (Voice AI Assistant)';
+        body = `Hello,\n\nI wanted to share that I have created an automated AI assistant and am testing sending an email through it right now.\n\nWith love,\nYour Son (${senderName})`;
       } else if (isFriend) {
         subject = 'Hey! Check this out (Sent via my AI Bot)';
         if (query.includes('bot') || query.includes('automated') || query.includes('created') || query.includes('agent')) {
