@@ -83,13 +83,12 @@ export class LLMClient {
 
     for (let i = 0; i < words.length; i++) {
       textAccumulator += (i > 0 ? ' ' : '') + words[i];
-      if (i % 4 === 0 || i === words.length - 1) {
+      if (i % 4 === 0) {
         yield {
           content: textAccumulator,
-          toolCalls: i === words.length - 1 ? response.toolCalls : undefined,
           isDone: false,
         };
-        await new Promise((r) => setTimeout(r, 15));
+        await new Promise((r) => setTimeout(r, 12));
       }
     }
 

@@ -130,26 +130,81 @@ export class LocalKnowledgeEngine {
       };
     }
 
-    if (query.startsWith('send email') || query.startsWith('send mail') || query.includes('mail to') || query.includes('email to')) {
-      let recipient = 'colleague@example.com';
+    if (
+      query.startsWith('send email') ||
+      query.startsWith('send mail') ||
+      query.startsWith('write a mail') ||
+      query.startsWith('write mail') ||
+      query.startsWith('write an email') ||
+      query.includes('mail to') ||
+      query.includes('email to')
+    ) {
+      let recipient = 'recipient@example.com';
       const emailMatch = query.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
       if (emailMatch && emailMatch[1]) {
         recipient = emailMatch[1];
       }
 
-      // Professional drafting based on intent
-      let subject = 'Absence Notice: Unable to Attend Today\'s Meeting';
-      let body = `Dear Colleague / Team,\n\nI am writing to inform you that I will unfortunately be unable to attend today's scheduled meeting due to unavoidable circumstances.\n\nI apologize for any inconvenience this may cause. Please let me know if there are meeting notes, recordings, or action items I should review. I will follow up promptly with any updates on my end.\n\nThank you for your understanding.\n\nBest regards,\n${_config?.githubToken ? 'Student / Engineer' : 'Harsh'}`;
+      const senderName = _config?.githubToken ? 'Harsh' : 'Harsh';
+      let subject = 'Important Message';
+      let body = '';
 
-      if (query.includes('assignment') || query.includes('homework') || query.includes('submission')) {
-        subject = 'Coursework & Lab Assignment Submission Update';
-        body = `Dear Professor,\n\nI hope this email finds you well.\n\nI am writing regarding my coursework assignment submission. I have finalized my project code and documentation for your review.\n\nPlease let me know if you need any additional details or files.\n\nThank you for your time and guidance.\n\nSincerely,\nStudent`;
-      } else if (!query.includes('meet') && !query.includes('attend')) {
-        subject = 'Important Update Regarding Today\'s Discussion';
+      // 1. Family / Mom / Son / Casual Relationship Detection
+      const isFamily =
+        query.includes('son') ||
+        query.includes('mom') ||
+        query.includes('mother') ||
+        query.includes('dad') ||
+        query.includes('father') ||
+        query.includes('family') ||
+        query.includes('sister') ||
+        query.includes('brother');
+
+      if (isFamily) {
+        subject = 'Exciting News! Message from your son (Automated AI Bot)';
+        if (query.includes('bot') || query.includes('automated') || query.includes('created')) {
+          body = `Hi Mom,\n\nI hope you are doing wonderful! I wanted to share something really exciting with you—your son has created an automated AI assistant and I am sending this email directly through it right now!\n\nEverything is working smoothly and I wanted you to be the very first person to test it out with me.\n\nWith lots of love,\nYour Son (${senderName})`;
+        } else {
+          body = `Hi Mom,\n\nI hope you are doing great! Just wanted to send you a quick note from my automated assistant.\n\nLove you,\n${senderName}`;
+        }
+      }
+      // 2. Assignment / Professor / Academic
+      else if (query.includes('assignment') || query.includes('homework') || query.includes('submission')) {
+        subject = 'Coursework & Assignment Update';
+        body = `Dear Professor,\n\nI hope this email finds you well.\n\nI am writing regarding my coursework assignment. I have finalized my project code and materials for your review.\n\nPlease let me know if any further details are required.\n\nSincerely,\n${senderName}`;
+      }
+      // 3. Meeting Absence
+      else if (query.includes('not attend') || query.includes('unable to attend') || (query.includes('meet') && query.includes('not'))) {
+        subject = "Absence Notice: Unable to Attend Today's Meeting";
+        body = `Dear Team,\n\nI am writing to inform you that I will unfortunately be unable to attend today's scheduled meeting due to unforeseen circumstances.\n\nI will review any shared notes or recordings and follow up promptly.\n\nBest regards,\n${senderName}`;
+      }
+      // 4. Dynamic user message extraction ("telling her that...", "saying that...", "that...")
+      else {
+        let extractedText = '';
+        if (query.includes('telling her that')) {
+          extractedText = query.split('telling her that')[1]?.trim();
+        } else if (query.includes('telling him that')) {
+          extractedText = query.split('telling him that')[1]?.trim();
+        } else if (query.includes('saying that')) {
+          extractedText = query.split('saying that')[1]?.trim();
+        } else if (query.includes('telling that')) {
+          extractedText = query.split('telling that')[1]?.trim();
+        } else if (query.includes('that ')) {
+          extractedText = query.split('that ')[1]?.trim();
+        }
+
+        if (extractedText) {
+          const capText = extractedText.charAt(0).toUpperCase() + extractedText.slice(1);
+          subject = `Update: ${capText.slice(0, 40)}...`;
+          body = `Hello,\n\n${capText}.\n\nBest regards,\n${senderName}`;
+        } else {
+          subject = 'Message from Voice AI Assistant';
+          body = `Hello,\n\nI am sending this message via my Voice AI Assistant.\n\nBest regards,\n${senderName}`;
+        }
       }
 
       return {
-        content: `I've drafted a professional email and sent it to **${recipient}**:\n\n**Subject:** *${subject}*\n\n\`\`\`text\n${body}\n\`\`\``,
+        content: `I've composed and sent the email to **${recipient}**:\n\n**Subject:** *${subject}*\n\n\`\`\`text\n${body}\n\`\`\``,
         toolCalls: [
           {
             id: 'call_gmail_' + Date.now(),

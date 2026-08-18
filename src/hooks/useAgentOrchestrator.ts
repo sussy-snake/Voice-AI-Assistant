@@ -204,14 +204,15 @@ export function useAgentOrchestrator(config: LLMConfig) {
 
       const currentHistory: ChatMessage[] = [...messages, userMessage];
       let recursionDepth = 0;
-      const MAX_RECURSION = 5;
+      const MAX_RECURSION = 3;
+      const executedToolIds = new Set<string>();
 
       try {
         while (recursionDepth < MAX_RECURSION) {
           recursionDepth++;
           const assistantMsgId = 'asst_' + Date.now() + '_' + recursionDepth;
           let streamedText = '';
-          let detectedToolCalls: ToolCall[] = [];
+          const detectedToolMap = new Map<string, ToolCall>();
 
           const assistantMessage: ChatMessage = {
             id: assistantMsgId,
@@ -234,19 +235,25 @@ export function useAgentOrchestrator(config: LLMConfig) {
             }
 
             if (chunk.toolCalls) {
-              detectedToolCalls = [...detectedToolCalls, ...chunk.toolCalls];
+              for (const tc of chunk.toolCalls) {
+                if (!detectedToolMap.has(tc.id)) {
+                  detectedToolMap.set(tc.id, tc);
+                }
+              }
+              const uniqueToolList = Array.from(detectedToolMap.values());
               setMessages((prev) =>
                 prev.map((m) =>
-                  m.id === assistantMsgId ? { ...m, toolCalls: detectedToolCalls } : m
+                  m.id === assistantMsgId ? { ...m, toolCalls: uniqueToolList } : m
                 )
               );
             }
           }
 
+          const uniqueTools = Array.from(detectedToolMap.values());
           const finalizedAsst: ChatMessage = {
             ...assistantMessage,
             content: streamedText,
-            toolCalls: detectedToolCalls.length > 0 ? detectedToolCalls : undefined,
+            toolCalls: uniqueTools.length > 0 ? uniqueTools : undefined,
             isStreaming: false,
           };
 
@@ -255,12 +262,15 @@ export function useAgentOrchestrator(config: LLMConfig) {
           );
           currentHistory.push(finalizedAsst);
 
-          if (detectedToolCalls.length === 0) {
+          // Find pending unexecuted tool calls
+          const unexecutedTools = uniqueTools.filter((tc) => !executedToolIds.has(tc.id));
+          if (unexecutedTools.length === 0) {
             break;
           }
 
           const toolResults: ToolResult[] = [];
-          for (const tc of detectedToolCalls) {
+          for (const tc of unexecutedTools) {
+            executedToolIds.add(tc.id);
             const res = await executeToolCall(tc);
             toolResults.push(res);
           }
@@ -276,6 +286,11 @@ export function useAgentOrchestrator(config: LLMConfig) {
 
           setMessages((prev) => [...prev, toolMessage]);
           currentHistory.push(toolMessage);
+
+          // If this was a single-turn tool completion without conversational LLM loop, stop cleanly
+          if (config.provider !== 'openai' && config.provider !== 'gemini' && config.provider !== 'anthropic') {
+            break;
+          }
         }
       } catch (err: any) {
         if (err.name !== 'AbortError') {
