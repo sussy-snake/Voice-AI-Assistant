@@ -1,5 +1,6 @@
 import { ChatMessage, LLMConfig, ToolCall } from '../types';
 import { getOpenAITools, getGeminiFunctionDeclarations, SYSTEM_TOOLS } from './toolsSchema';
+import { LocalKnowledgeEngine } from './localKnowledgeEngine';
 
 export interface LLMResponseChunk {
   content?: string;
@@ -18,30 +19,90 @@ export class LLMClient {
     this.config = { ...this.config, ...newConfig };
   }
 
+  private getEnrichedSystemPrompt(): string {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    const timeStr = now.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    return `${this.config.systemPrompt}\n\n[Live Environment Context: Today is ${dateStr}, Current Time is ${timeStr} (${tz}). Platform: Windows/Cross-Platform Desktop. User: Computer Science Engineering Student. Support CS topics like DSA, Operating Systems, DBMS, Networks, and Code Debugging.]`;
+  }
+
   /**
-   * Execute chat generation with streaming and tool-calling support
+   * Execute chat generation with streaming, tool calling, and instant fallback
    */
   public async *streamChat(
     messages: ChatMessage[],
     signal?: AbortSignal
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
-    switch (this.config.provider) {
-      case 'ollama':
-        yield* this.streamOllama(messages, signal);
-        break;
-      case 'gemini':
-        yield* this.streamGemini(messages, signal);
-        break;
-      case 'openai':
-      case 'llamacpp':
-        yield* this.streamOpenAICompatible(messages, signal);
-        break;
-      case 'anthropic':
-        yield* this.streamAnthropic(messages, signal);
-        break;
-      default:
-        yield* this.streamOllama(messages, signal);
+    try {
+      switch (this.config.provider) {
+        case 'ollama':
+          yield* this.streamOllama(messages, signal);
+          break;
+        case 'gemini':
+          yield* this.streamGemini(messages, signal);
+          break;
+        case 'openai':
+        case 'llamacpp':
+          yield* this.streamOpenAICompatible(messages, signal);
+          break;
+        case 'anthropic':
+          yield* this.streamAnthropic(messages, signal);
+          break;
+        default:
+          yield* this.streamOllama(messages, signal);
+      }
+    } catch (err: any) {
+      console.warn('Primary LLM provider failed, switching to Instant Local Knowledge Engine:', err);
+      yield* this.streamLocalFallback(messages, err?.message || 'Connection offline');
     }
+  }
+
+  // -------------------------------------------------------------
+  // Built-in Instant Local Knowledge Engine Fallback
+  // -------------------------------------------------------------
+  private async *streamLocalFallback(
+    messages: ChatMessage[],
+    reason: string
+  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    const response = LocalKnowledgeEngine.processQuery(messages);
+
+    // Simulate responsive token streaming for natural feel
+    const words = response.content.split(' ');
+    let textAccumulator = '';
+
+    for (let i = 0; i < words.length; i++) {
+      textAccumulator += (i > 0 ? ' ' : '') + words[i];
+      if (i % 4 === 0 || i === words.length - 1) {
+        yield {
+          content: textAccumulator,
+          toolCalls: i === words.length - 1 ? response.toolCalls : undefined,
+          isDone: false,
+        };
+        await new Promise((r) => setTimeout(r, 15));
+      }
+    }
+
+    const tip =
+      this.config.provider === 'ollama'
+        ? '\n\n> 💡 *Note: Ollama server was not detected at `http://localhost:11434`. You can launch Ollama locally or enter a free Google Gemini key in [Settings ⚙️] for continuous cloud AI.*'
+        : `\n\n> 💡 *Note: ${reason}. Running in Instant Companion Mode.*`;
+
+    yield {
+      content: textAccumulator + tip,
+      toolCalls: response.toolCalls,
+      isDone: true,
+    };
   }
 
   // -------------------------------------------------------------
@@ -52,7 +113,7 @@ export class LLMClient {
     signal?: AbortSignal
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
     const formattedMessages = [
-      { role: 'system', content: this.config.systemPrompt },
+      { role: 'system', content: this.getEnrichedSystemPrompt() },
       ...messages.map((m) => {
         if (m.role === 'tool' && m.toolResults) {
           return {
@@ -141,7 +202,7 @@ export class LLMClient {
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
     const apiKey = this.config.geminiApiKey;
     if (!apiKey) {
-      throw new Error('Gemini API key is not configured. Please set it in Settings.');
+      throw new Error('Gemini API key is missing. Please add your free key in Settings.');
     }
 
     const model = this.config.geminiModel || 'gemini-2.0-flash';
@@ -183,7 +244,7 @@ export class LLMClient {
 
     const bodyPayload = {
       systemInstruction: {
-        parts: [{ text: this.config.systemPrompt }],
+        parts: [{ text: this.getEnrichedSystemPrompt() }],
       },
       contents,
       tools: getGeminiFunctionDeclarations(),
@@ -215,7 +276,6 @@ export class LLMClient {
       buffer += decoder.decode(value, { stream: true });
       const cleaned = buffer.trim();
 
-      // Gemini streams JSON array objects
       try {
         let jsonArray: any[] = [];
         if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
@@ -276,7 +336,7 @@ export class LLMClient {
     const payload = {
       model: isLlamaCpp ? 'default' : this.config.openaiModel,
       messages: [
-        { role: 'system', content: this.config.systemPrompt },
+        { role: 'system', content: this.getEnrichedSystemPrompt() },
         ...messages.map((m) => ({
           role: m.role,
           content: m.content,
@@ -369,7 +429,7 @@ export class LLMClient {
       },
       body: JSON.stringify({
         model: this.config.anthropicModel || 'claude-3-5-sonnet-20241022',
-        system: this.config.systemPrompt,
+        system: this.getEnrichedSystemPrompt(),
         max_tokens: 4096,
         messages: messages
           .filter((m) => m.role !== 'system')

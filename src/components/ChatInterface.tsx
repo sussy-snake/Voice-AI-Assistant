@@ -12,6 +12,13 @@ import {
   Bot,
   User,
   Trash2,
+  Copy,
+  Check,
+  BookOpen,
+  Code2,
+  Cpu,
+  Database,
+  Search,
 } from 'lucide-react';
 import { ChatMessage, ToolResult, FileMatch, SystemStatus, Task } from '../types';
 import { AudioVisualizer } from './AudioVisualizer';
@@ -49,6 +56,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onClearChat,
 }) => {
   const [inputVal, setInputVal] = useState('');
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const scrollEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -63,12 +71,90 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
+  const handleCopyCode = (code: string, idx: number) => {
+    navigator.clipboard.writeText(code);
+    setCopiedIndex(idx);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  // -------------------------------------------------------------
+  // Render Markdown Text with Code Blocks & Copy Buttons
+  // -------------------------------------------------------------
+  const renderMessageContent = (content: string) => {
+    const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+    let blockCount = 0;
+
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({
+          type: 'text',
+          text: content.substring(lastIndex, match.index),
+        });
+      }
+
+      parts.push({
+        type: 'code',
+        lang: match[1] || 'text',
+        code: match[2],
+        index: blockCount++,
+      });
+
+      lastIndex = codeBlockRegex.lastIndex;
+    }
+
+    if (lastIndex < content.length) {
+      parts.push({
+        type: 'text',
+        text: content.substring(lastIndex),
+      });
+    }
+
+    if (parts.length === 0) {
+      parts.push({ type: 'text', text: content });
+    }
+
+    return (
+      <div className="space-y-2">
+        {parts.map((p, i) => {
+          if (p.type === 'code') {
+            const isCopied = copiedIndex === p.index;
+            return (
+              <div key={i} className="my-2 rounded-lg overflow-hidden border border-slate-700 bg-slate-950">
+                <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900 border-b border-slate-800 text-[10px] font-mono text-slate-400">
+                  <span>{p.lang}</span>
+                  <button
+                    onClick={() => handleCopyCode(p.code || '', p.index!)}
+                    className="flex items-center space-x-1 text-slate-300 hover:text-white"
+                  >
+                    {isCopied ? <Check className="w-3 h-3 text-accent-emerald" /> : <Copy className="w-3 h-3" />}
+                    <span>{isCopied ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+                <pre className="p-3 text-[11px] font-mono text-slate-100 overflow-x-auto whitespace-pre leading-relaxed">
+                  <code>{p.code}</code>
+                </pre>
+              </div>
+            );
+          }
+          return (
+            <div key={i} className="whitespace-pre-wrap select-text leading-relaxed">
+              {p.text}
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   // -------------------------------------------------------------
@@ -195,13 +281,22 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return null;
   };
 
+  const csQuickPrompts = [
+    { label: "📅 Today's Date", query: "What is today's exact date and time?", icon: Calendar },
+    { label: '🚀 DSA Complexity', query: 'Show me the Big-O time complexity cheatsheet for sorting and tree data structures with examples.', icon: Code2 },
+    { label: '🖥️ OS Deadlocks', query: 'Explain the 4 Coffman conditions for deadlocks in Operating Systems with avoidance strategies.', icon: Cpu },
+    { label: '💾 DBMS ACID', query: 'Explain ACID properties and 1NF/2NF/3NF Normalization in DBMS.', icon: Database },
+    { label: '⏰ Schedule Study', query: 'Schedule DSA revision session tomorrow at 4pm.', icon: BookOpen },
+    { label: '🔍 Find Notes', query: 'Find my notes and pdf files on this computer.', icon: Search },
+  ];
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Messages Scroll Area */}
       <div className="flex-1 overflow-y-auto px-3.5 py-4 space-y-3.5">
         {messages.map((m) => {
           const isUser = m.role === 'user';
-          if (m.role === 'tool') return null; // Rendered inline with assistant responses
+          if (m.role === 'tool') return null;
 
           return (
             <div
@@ -215,14 +310,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               )}
 
               <div
-                className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-xs sm:text-[13px] leading-relaxed shadow-sm ${
+                className={`max-w-[90%] sm:max-w-[85%] rounded-xl px-3.5 py-2.5 text-xs sm:text-[13px] leading-relaxed shadow-sm ${
                   isUser
                     ? 'bg-gradient-to-br from-brand-600 to-brand-700 text-white rounded-tr-none'
                     : 'bg-surface border border-surfaceBorder text-slate-200 rounded-tl-none'
                 }`}
               >
-                {/* Message Body */}
-                <div className="whitespace-pre-wrap select-text">{m.content}</div>
+                {/* Message Body with Code Highlighter */}
+                {renderMessageContent(m.content)}
 
                 {/* Tool Calling Badges */}
                 {m.toolCalls && m.toolCalls.length > 0 && (
@@ -276,6 +371,24 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div ref={scrollEndRef} />
       </div>
 
+      {/* CS Engineering Quick Action Chips */}
+      <div className="px-3.5 py-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar border-t border-surfaceBorder/40 bg-surface/30">
+        {csQuickPrompts.map((chip, i) => {
+          const Icon = chip.icon;
+          return (
+            <button
+              key={i}
+              onClick={() => onSendMessage(chip.query)}
+              disabled={isProcessing}
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-[11px] text-slate-300 hover:text-white shrink-0 transition-colors"
+            >
+              <Icon className="w-3 h-3 text-brand-400" />
+              <span>{chip.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Audio Waveform Meter */}
       <div className="px-3.5 pb-2">
         <AudioVisualizer volume={volume} isListening={isListening} isSpeaking={isSpeaking} />
@@ -325,7 +438,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               isListening
                 ? 'Listening to speech...'
                 : voiceMode === 'push-to-talk'
-                ? 'Hold Mic or Space to speak, or type command...'
+                ? 'Hold Space or Mic to speak, or type coding/study questions...'
                 : 'Type or speak naturally...'
             }
             disabled={isProcessing}
