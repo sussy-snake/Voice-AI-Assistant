@@ -224,10 +224,143 @@ export const TauriBridge = {
       });
     }
 
+    if (!options.access_token || !options.access_token.trim()) {
+      throw new Error('Google OAuth token is missing. Please set your token in Google Hub (✉️).');
+    }
+
+    const rawEmail = `To: ${options.to}\r\nSubject: ${options.subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${options.body}`;
+    const encoded = btoa(unescape(encodeURIComponent(rawEmail)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${options.access_token.trim()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ raw: encoded }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+      throw new Error(err.error?.message || `Gmail API error (${res.status})`);
+    }
+
     return {
       success: true,
-      message: `[Simulated] Email sent via Gmail to ${options.to}!`,
+      message: `Email sent successfully to ${options.to}!`,
       details: `Subject: ${options.subject}`,
+    };
+  },
+
+  async gmailListMessages(options: {
+    access_token: string;
+    query?: string;
+    max_results?: number;
+  }): Promise<GmailMessageSummary[]> {
+    if (isTauri()) {
+      return await invokeTauri<GmailMessageSummary[]>('gmail_list_messages', {
+        accessToken: options.access_token,
+        query: options.query,
+        maxResults: options.max_results,
+      });
+    }
+
+    if (!options.access_token || !options.access_token.trim()) {
+      return [];
+    }
+
+    const q = options.query ? `&q=${encodeURIComponent(options.query)}` : '';
+    const limit = options.max_results || 10;
+    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${limit}${q}`, {
+      headers: { Authorization: `Bearer ${options.access_token.trim()}` },
+    });
+
+    if (!res.ok) {
+      console.warn('Gmail list error:', res.statusText);
+      return [];
+    }
+
+    const data = await res.json();
+    const rawList = data.messages || [];
+
+    const summaries: GmailMessageSummary[] = [];
+    for (const m of rawList) {
+      const detailRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
+        { headers: { Authorization: `Bearer ${options.access_token.trim()}` } }
+      );
+      if (detailRes.ok) {
+        const detail = await detailRes.json();
+        let sender = '';
+        let subject = '';
+        let date = '';
+        for (const h of detail.payload?.headers || []) {
+          if (h.name?.toLowerCase() === 'from') sender = h.value;
+          if (h.name?.toLowerCase() === 'subject') subject = h.value;
+          if (h.name?.toLowerCase() === 'date') date = h.value;
+        }
+        summaries.push({
+          id: m.id,
+          thread_id: detail.threadId || '',
+          snippet: detail.snippet || '',
+          sender,
+          subject,
+          date,
+        });
+      }
+    }
+
+    return summaries;
+  },
+
+  async gmailReadMessage(options: {
+    access_token: string;
+    message_id: string;
+  }): Promise<GmailMessageDetail> {
+    if (isTauri()) {
+      return await invokeTauri<GmailMessageDetail>('gmail_read_message', {
+        accessToken: options.access_token,
+        messageId: options.message_id,
+      });
+    }
+
+    if (!options.access_token || !options.access_token.trim()) {
+      throw new Error('Google OAuth token is missing.');
+    }
+
+    const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${options.message_id}?format=full`, {
+      headers: { Authorization: `Bearer ${options.access_token.trim()}` },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Gmail read error (${res.status})`);
+    }
+
+    const data = await res.json();
+    let sender = 'Unknown';
+    let to = 'Me';
+    let subject = 'No Subject';
+    let date = '';
+
+    for (const h of data.payload?.headers || []) {
+      if (h.name?.toLowerCase() === 'from') sender = h.value;
+      if (h.name?.toLowerCase() === 'to') to = h.value;
+      if (h.name?.toLowerCase() === 'subject') subject = h.value;
+      if (h.name?.toLowerCase() === 'date') date = h.value;
+    }
+
+    return {
+      id: options.message_id,
+      thread_id: data.threadId || '',
+      sender,
+      to,
+      subject,
+      date,
+      snippet: data.snippet || '',
+      body_plain: data.snippet || 'Email body rendered.',
     };
   },
 

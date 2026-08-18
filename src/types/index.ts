@@ -102,6 +102,26 @@ export interface CalendarEventItem {
   html_link?: string | null;
 }
 
+export interface GmailMessageSummary {
+  id: string;
+  thread_id: string;
+  snippet: string;
+  sender?: string | null;
+  subject?: string | null;
+  date?: string | null;
+}
+
+export interface GmailMessageDetail {
+  id: string;
+  thread_id: string;
+  sender: string;
+  to: string;
+  subject: string;
+  date: string;
+  snippet: string;
+  body_plain: string;
+}
+
 export interface GoogleOperationResult {
   success: boolean;
   message: string;

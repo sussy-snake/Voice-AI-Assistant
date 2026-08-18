@@ -281,6 +281,57 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       );
     }
 
+    if (tr.name === 'gmail_list_messages') {
+      const list: any[] = Array.isArray(tr.result) ? tr.result : [];
+      return (
+        <div key={tr.toolCallId} className="my-2 p-3 rounded-lg bg-surface/95 border border-accent-rose/40 text-xs space-y-1.5">
+          <div className="flex items-center justify-between font-semibold text-accent-rose">
+            <span className="flex items-center space-x-1.5">
+              <Mail className="w-4 h-4" />
+              <span>Inbox Search Matches ({list.length})</span>
+            </span>
+          </div>
+          {list.length === 0 ? (
+            <p className="text-slate-400 italic">No matching emails found in inbox.</p>
+          ) : (
+            <div className="max-h-48 overflow-y-auto space-y-1.5">
+              {list.map((msg, i) => (
+                <div key={i} className="p-2 rounded bg-slate-900 border border-slate-800 space-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-200 truncate max-w-[70%]">{msg.sender || 'Unknown'}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">{msg.date?.split(' ').slice(0, 4).join(' ')}</span>
+                  </div>
+                  <div className="text-slate-300 font-medium">{msg.subject || '(No Subject)'}</div>
+                  <div className="text-[11px] text-slate-500 truncate">{msg.snippet}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (tr.name === 'gmail_read_message') {
+      const detail: any = tr.result;
+      return (
+        <div key={tr.toolCallId} className="my-2 p-3 rounded-lg bg-surface/95 border border-accent-rose/40 text-xs space-y-2">
+          <div className="flex items-center justify-between font-semibold text-accent-rose border-b border-slate-800 pb-1">
+            <span className="flex items-center space-x-1.5">
+              <Mail className="w-4 h-4" />
+              <span>{detail?.subject || 'Email Details'}</span>
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">{detail?.date}</span>
+          </div>
+          <div className="text-[11px] text-slate-400">
+            <span>From: <strong className="text-slate-200">{detail?.sender}</strong></span>
+          </div>
+          <div className="p-2 rounded bg-slate-950 border border-slate-800 text-slate-200 whitespace-pre-wrap max-h-40 overflow-y-auto leading-relaxed">
+            {detail?.body_plain || detail?.snippet}
+          </div>
+        </div>
+      );
+    }
+
     if (tr.name === 'calendar_add_event') {
       const gRes: GoogleOperationResult = tr.result;
       return (

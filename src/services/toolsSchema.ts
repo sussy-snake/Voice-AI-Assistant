@@ -175,6 +175,38 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: 'gmail_list_messages',
+    description: 'Searches and lists emails in your Gmail inbox based on a search query (e.g. "from:professor", "subject:exam", "is:unread", "interview").',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Gmail search query string (e.g. "from:google", "exam", "is:unread").',
+        },
+        max_results: {
+          type: 'number',
+          description: 'Maximum number of emails to retrieve (default 10).',
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'gmail_read_message',
+    description: 'Reads the full content and plain-text body of a specific email by its message ID.',
+    parameters: {
+      type: 'object',
+      properties: {
+        message_id: {
+          type: 'string',
+          description: 'The unique message ID of the email to read.',
+        },
+      },
+      required: ['message_id'],
+    },
+  },
+  {
     name: 'calendar_add_event',
     description: 'Marks an important date, exam, submission deadline, or study block directly on your Google Calendar.',
     parameters: {

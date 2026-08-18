@@ -42,6 +42,8 @@ pub fn run() {
 
             // Google Suite (Gmail & Google Calendar)
             commands::google::gmail_send_message,
+            commands::google::gmail_list_messages,
+            commands::google::gmail_read_message,
             commands::google::calendar_add_event,
             commands::google::calendar_list_events,
 

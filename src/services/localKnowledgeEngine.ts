@@ -103,8 +103,33 @@ export class LocalKnowledgeEngine {
     }
 
     // -------------------------------------------------------------
-    // 3. Gmail Integration: Send Email Intent
+    // 3. Gmail Integration: Search, Read & Send Emails
     // -------------------------------------------------------------
+    if (query.includes('read email') || query.includes('read mail') || query.includes('check email') || query.includes('check my email') || query.includes('search email') || query.includes('inbox')) {
+      let searchQuery: string | undefined = undefined;
+      if (query.includes('from ')) {
+        searchQuery = `from:${query.split('from ')[1]?.split(' ')[0]}`;
+      } else if (query.includes('unread')) {
+        searchQuery = 'is:unread';
+      } else if (query.includes('about ') || query.includes('subject ')) {
+        searchQuery = query.split(/about |subject /i)[1]?.trim();
+      }
+
+      return {
+        content: `Searching your Gmail inbox for ${searchQuery ? `**"${searchQuery}"**` : 'recent emails'}...`,
+        toolCalls: [
+          {
+            id: 'call_gmail_list_' + Date.now(),
+            name: 'gmail_list_messages',
+            arguments: {
+              query: searchQuery,
+              max_results: 8,
+            },
+          },
+        ],
+      };
+    }
+
     if (query.startsWith('send email') || query.startsWith('send mail') || query.includes('mail to') || query.includes('email to')) {
       let recipient = 'colleague@example.com';
       const emailMatch = query.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);

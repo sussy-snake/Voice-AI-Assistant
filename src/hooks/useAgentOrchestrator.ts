@@ -113,6 +113,23 @@ export function useAgentOrchestrator(config: LLMConfig) {
           break;
         }
 
+        case 'gmail_list_messages': {
+          resultData = await TauriBridge.gmailListMessages({
+            access_token: config.googleAccessToken || '',
+            query: toolCall.arguments.query,
+            max_results: toolCall.arguments.max_results,
+          });
+          break;
+        }
+
+        case 'gmail_read_message': {
+          resultData = await TauriBridge.gmailReadMessage({
+            access_token: config.googleAccessToken || '',
+            message_id: toolCall.arguments.message_id,
+          });
+          break;
+        }
+
         case 'calendar_add_event': {
           resultData = await TauriBridge.calendarAddEvent({
             access_token: config.googleAccessToken || '',
