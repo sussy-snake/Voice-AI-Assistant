@@ -140,10 +140,37 @@ export const TauriBridge = {
       });
     }
 
+    if (!options.github_token || !options.github_token.trim()) {
+      throw new Error('GitHub token is missing. Please enter your GitHub token.');
+    }
+
+    // Direct Live GitHub REST API Call
+    const res = await fetch('https://api.github.com/user/repos', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${options.github_token.trim()}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: options.repo_name.trim(),
+        private: options.is_private ?? false,
+        description: options.description || 'Created with Local Voice AI Assistant',
+        auto_init: true,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(err.message || `GitHub error (${res.status})`);
+    }
+
+    const data = await res.json();
     return {
       success: true,
-      message: `[Simulated] Repository '${options.repo_name}' created on GitHub!`,
-      repo_url: `https://github.com/user/${options.repo_name}`,
+      message: `Repository '${options.repo_name}' created live on your GitHub profile!`,
+      repo_url: data.html_url,
+      output: `Remote URL: ${data.clone_url}`,
     };
   },
 
@@ -152,11 +179,31 @@ export const TauriBridge = {
       return await invokeTauri<GitHubRepo[]>('git_list_user_repos', { githubToken: github_token });
     }
 
-    return [
-      { name: 'voice-ai-assistant', html_url: 'https://github.com/user/voice-ai-assistant', clone_url: 'https://github.com/user/voice-ai-assistant.git', private: false, description: 'Local Voice AI Assistant' },
-      { name: 'dsa-practice-solutions', html_url: 'https://github.com/user/dsa-practice-solutions', clone_url: 'https://github.com/user/dsa-practice-solutions.git', private: false, description: 'LeetCode & DSA in C++' },
-      { name: 'os-kernel-sim', html_url: 'https://github.com/user/os-kernel-sim', clone_url: 'https://github.com/user/os-kernel-sim.git', private: true, description: 'Operating Systems Coursework' },
-    ];
+    if (!github_token || !github_token.trim()) {
+      return [];
+    }
+
+    // Direct Live GitHub API Call
+    const res = await fetch('https://api.github.com/user/repos?sort=updated&per_page=15', {
+      headers: {
+        Authorization: `Bearer ${github_token.trim()}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    });
+
+    if (!res.ok) {
+      console.warn('GitHub list repos error:', res.statusText);
+      return [];
+    }
+
+    const data = await res.json();
+    return data.map((r: any) => ({
+      name: r.name,
+      html_url: r.html_url,
+      clone_url: r.clone_url,
+      private: r.private,
+      description: r.description,
+    }));
   },
 
   // -----------------------------------------------------------
