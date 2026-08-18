@@ -73,32 +73,22 @@ export class LLMClient {
   // -------------------------------------------------------------
   private async *streamLocalFallback(
     messages: ChatMessage[],
-    reason: string
+    _reason: string
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
-    const response = LocalKnowledgeEngine.processQuery(messages);
+    const response = LocalKnowledgeEngine.processQuery(messages, this.config);
 
-    // Simulate responsive token streaming for natural feel
+    // Stream word deltas cleanly
     const words = response.content.split(' ');
-    let textAccumulator = '';
-
     for (let i = 0; i < words.length; i++) {
-      textAccumulator += (i > 0 ? ' ' : '') + words[i];
-      if (i % 4 === 0) {
-        yield {
-          content: textAccumulator,
-          isDone: false,
-        };
-        await new Promise((r) => setTimeout(r, 12));
-      }
+      const delta = (i > 0 ? ' ' : '') + words[i];
+      yield {
+        content: delta,
+        isDone: false,
+      };
+      await new Promise((r) => setTimeout(r, 8));
     }
 
-    const tip =
-      this.config.provider === 'ollama'
-        ? '\n\n> 💡 *Note: Ollama server was not detected at `http://localhost:11434`. You can launch Ollama locally or enter a free Google Gemini key in [Settings ⚙️] for continuous cloud AI.*'
-        : `\n\n> 💡 *Note: ${reason}. Running in Instant Companion Mode.*`;
-
     yield {
-      content: textAccumulator + tip,
       toolCalls: response.toolCalls,
       isDone: true,
     };
@@ -163,7 +153,6 @@ export class LLMClient {
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-
         try {
           const json = JSON.parse(trimmed);
           const toolCalls: ToolCall[] = [];
@@ -171,11 +160,9 @@ export class LLMClient {
           if (json.message?.tool_calls) {
             for (const tc of json.message.tool_calls) {
               toolCalls.push({
-                id: tc.id || 'call_' + Math.random().toString(36).substring(2, 9),
-                name: tc.function?.name || tc.name,
-                arguments: typeof tc.function?.arguments === 'string'
-                  ? JSON.parse(tc.function.arguments)
-                  : tc.function?.arguments || {},
+                id: 'call_' + Math.random().toString(36).substring(2, 9),
+                name: tc.function.name,
+                arguments: tc.function.arguments,
               });
             }
           }
@@ -186,14 +173,14 @@ export class LLMClient {
             isDone: json.done || false,
           };
         } catch {
-          // Ignore partial parse
+          // ignore
         }
       }
     }
   }
 
   // -------------------------------------------------------------
-  // Google Gemini API Streamer
+  // Google Gemini Streamer (v1beta)
   // -------------------------------------------------------------
   private async *streamGemini(
     messages: ChatMessage[],
@@ -207,39 +194,58 @@ export class LLMClient {
     const model = this.config.geminiModel || 'gemini-2.0-flash';
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
 
-    const contents = messages.map((m) => {
-      let role = m.role === 'assistant' ? 'model' : 'user';
+    // Filter out welcome message and ensure conversation starts with user message
+    const filteredMessages = messages.filter((m) => m.id !== 'welcome');
+    const firstUserIndex = filteredMessages.findIndex((m) => m.role === 'user');
+    const validMessages = firstUserIndex >= 0 ? filteredMessages.slice(firstUserIndex) : filteredMessages;
+
+    const contents: any[] = [];
+    for (const m of validMessages) {
       const parts: any[] = [];
 
-      if (m.toolCalls && m.toolCalls.length > 0) {
-        for (const tc of m.toolCalls) {
-          parts.push({
-            functionCall: {
-              name: tc.name,
-              args: tc.arguments,
-            },
-          });
+      if (m.role === 'assistant') {
+        if (m.toolCalls && m.toolCalls.length > 0) {
+          for (const tc of m.toolCalls) {
+            parts.push({
+              functionCall: {
+                name: tc.name,
+                args: tc.arguments,
+              },
+            });
+          }
         }
-      }
-
-      if (m.toolResults && m.toolResults.length > 0) {
-        role = 'user';
+        if (m.content) {
+          parts.push({ text: m.content });
+        }
+        if (parts.length > 0) {
+          contents.push({ role: 'model', parts });
+        }
+      } else if (m.role === 'tool' && m.toolResults) {
         for (const tr of m.toolResults) {
           parts.push({
             functionResponse: {
               name: tr.name,
-              response: { output: tr.result, error: tr.error },
+              response: { name: tr.name, content: tr.result || tr.error || 'ok' },
             },
           });
         }
+        if (parts.length > 0) {
+          contents.push({ role: 'user', parts });
+        }
+      } else if (m.role === 'user') {
+        if (m.content) {
+          parts.push({ text: m.content });
+        }
+        if (parts.length > 0) {
+          contents.push({ role: 'user', parts });
+        }
       }
+    }
 
-      if (m.content) {
-        parts.push({ text: m.content });
-      }
-
-      return { role, parts };
-    });
+    // Must have at least one user message
+    if (contents.length === 0) {
+      contents.push({ role: 'user', parts: [{ text: 'Hello' }] });
+    }
 
     const bodyPayload = {
       systemInstruction: {
