@@ -230,8 +230,15 @@ export const TauriBridge = {
       throw new Error('Google OAuth token is missing. Please set your token in Google Hub (✉️).');
     }
 
-    const rawEmail = `To: ${options.to}\r\nSubject: ${options.subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n${options.body}`;
-    const encoded = btoa(unescape(encodeURIComponent(rawEmail)))
+    const rawEmail = `To: ${options.to}\r\nSubject: ${options.subject}\r\nContent-Type: text/plain; charset=utf-8\r\nMIME-Version: 1.0\r\n\r\n${options.body}`;
+    
+    // Clean UTF-8 to base64url converter
+    const utf8Bytes = new TextEncoder().encode(rawEmail);
+    let binary = '';
+    for (let i = 0; i < utf8Bytes.length; i++) {
+      binary += String.fromCharCode(utf8Bytes[i]);
+    }
+    const encoded = btoa(binary)
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');

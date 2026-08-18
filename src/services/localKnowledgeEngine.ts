@@ -7,6 +7,14 @@ export interface LocalEngineResponse {
 
 export class LocalKnowledgeEngine {
   public static processQuery(messages: ChatMessage[], _config?: { githubToken?: string; googleAccessToken?: string }): LocalEngineResponse {
+    // If the last message in history is a tool result, do NOT re-generate tool calls!
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && (lastMsg.role === 'tool' || (lastMsg.toolResults && lastMsg.toolResults.length > 0))) {
+      return {
+        content: '✅ All requested operations have been executed and saved.',
+      };
+    }
+
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     const query = (lastUserMsg?.content || '').trim().toLowerCase();
 
@@ -149,16 +157,23 @@ export class LocalKnowledgeEngine {
       let subject = 'Important Message';
       let body = '';
 
-      // 1. Family / Mom / Son / Casual Relationship Detection
+      // 1. Family Detection
       const isFamily =
         query.includes('son') ||
         query.includes('mom') ||
         query.includes('mother') ||
         query.includes('dad') ||
         query.includes('father') ||
-        query.includes('family') ||
         query.includes('sister') ||
         query.includes('brother');
+
+      // 2. Friend / Buddy / Casual Detection
+      const isFriend =
+        query.includes('friend') ||
+        query.includes('buddy') ||
+        query.includes('bro') ||
+        query.includes('pal') ||
+        query.includes('dude');
 
       if (isFamily) {
         subject = 'Exciting News! Message from your son (Automated AI Bot)';
@@ -167,35 +182,39 @@ export class LocalKnowledgeEngine {
         } else {
           body = `Hi Mom,\n\nI hope you are doing great! Just wanted to send you a quick note from my automated assistant.\n\nLove you,\n${senderName}`;
         }
+      } else if (isFriend) {
+        subject = 'Hey! Check this out (Sent via my AI Bot)';
+        if (query.includes('bot') || query.includes('automated') || query.includes('created') || query.includes('agent')) {
+          body = `Hey,\n\nI just built an automated AI agent for my local workstation and wanted to test sending an email through it to you!\n\nLet me know if you got this.\n\nCheers,\n${senderName}`;
+        } else {
+          body = `Hey,\n\nHope all is well! Just testing out my new local AI assistant.\n\nCheers,\n${senderName}`;
+        }
       }
-      // 2. Assignment / Professor / Academic
+      // 3. Assignment / Professor / Academic
       else if (query.includes('assignment') || query.includes('homework') || query.includes('submission')) {
         subject = 'Coursework & Assignment Update';
         body = `Dear Professor,\n\nI hope this email finds you well.\n\nI am writing regarding my coursework assignment. I have finalized my project code and materials for your review.\n\nPlease let me know if any further details are required.\n\nSincerely,\n${senderName}`;
       }
-      // 3. Meeting Absence
+      // 4. Meeting Absence
       else if (query.includes('not attend') || query.includes('unable to attend') || (query.includes('meet') && query.includes('not'))) {
         subject = "Absence Notice: Unable to Attend Today's Meeting";
         body = `Dear Team,\n\nI am writing to inform you that I will unfortunately be unable to attend today's scheduled meeting due to unforeseen circumstances.\n\nI will review any shared notes or recordings and follow up promptly.\n\nBest regards,\n${senderName}`;
       }
-      // 4. Dynamic user message extraction ("telling her that...", "saying that...", "that...")
+      // 5. Dynamic user message extraction
       else {
-        let extractedText = '';
-        if (query.includes('telling her that')) {
-          extractedText = query.split('telling her that')[1]?.trim();
-        } else if (query.includes('telling him that')) {
-          extractedText = query.split('telling him that')[1]?.trim();
-        } else if (query.includes('saying that')) {
-          extractedText = query.split('saying that')[1]?.trim();
-        } else if (query.includes('telling that')) {
-          extractedText = query.split('telling that')[1]?.trim();
-        } else if (query.includes('that ')) {
-          extractedText = query.split('that ')[1]?.trim();
-        }
+        let cleanText = query
+          .replace(/send email to\s+[^\s]+/i, '')
+          .replace(/send mail to\s+[^\s]+/i, '')
+          .replace(/write a mail to\s+[^\s]+/i, '')
+          .replace(/write an email to\s+[^\s]+/i, '')
+          .replace(/telling (her|him|them) that/i, '')
+          .replace(/saying that/i, '')
+          .replace(/telling that/i, '')
+          .trim();
 
-        if (extractedText) {
-          const capText = extractedText.charAt(0).toUpperCase() + extractedText.slice(1);
-          subject = `Update: ${capText.slice(0, 40)}...`;
+        if (cleanText.length > 5) {
+          const capText = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
+          subject = `Update: ${capText.slice(0, 35)}...`;
           body = `Hello,\n\n${capText}.\n\nBest regards,\n${senderName}`;
         } else {
           subject = 'Message from Voice AI Assistant';

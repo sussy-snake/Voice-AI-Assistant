@@ -205,7 +205,7 @@ export class LLMClient {
     }
 
     const model = this.config.geminiModel || 'gemini-2.0-flash';
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}`;
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
 
     const contents = messages.map((m) => {
       let role = m.role === 'assistant' ? 'model' : 'user';
@@ -273,17 +273,17 @@ export class LLMClient {
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-      const cleaned = buffer.trim();
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
-      try {
-        let jsonArray: any[] = [];
-        if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
-          jsonArray = JSON.parse(cleaned);
-        } else if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
-          jsonArray = [JSON.parse(cleaned)];
-        }
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const jsonStr = trimmed.substring(6).trim();
+        if (!jsonStr || jsonStr === '[DONE]') continue;
 
-        for (const item of jsonArray) {
+        try {
+          const item = JSON.parse(jsonStr);
           const candidate = item.candidates?.[0];
           const parts = candidate?.content?.parts || [];
           let text = '';
@@ -305,9 +305,9 @@ export class LLMClient {
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
             isDone: candidate?.finishReason === 'STOP',
           };
+        } catch {
+          // ignore parsing error for chunk
         }
-      } catch {
-        // Continue buffering until valid JSON
       }
     }
   }
