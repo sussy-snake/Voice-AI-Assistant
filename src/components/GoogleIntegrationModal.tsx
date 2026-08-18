@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Calendar, Send, Plus, RefreshCw, Clock, ExternalLink, Inbox, Search, Eye } from 'lucide-react';
+import { X, Mail, Calendar, Send, Plus, RefreshCw, Clock, ExternalLink, Inbox, Search } from 'lucide-react';
 import { CalendarEventItem, GmailMessageSummary, GmailMessageDetail } from '../types';
 import { TauriBridge } from '../services/tauriBridge';
 

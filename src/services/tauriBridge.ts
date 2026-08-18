@@ -7,6 +7,8 @@ import {
   GitHubRepo,
   GoogleOperationResult,
   CalendarEventItem,
+  GmailMessageSummary,
+  GmailMessageDetail,
   HardwareComputeProfile,
   ComputeTaskResult,
 } from '../types';
