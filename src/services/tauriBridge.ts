@@ -609,4 +609,27 @@ export const TauriBridge = {
       message: 'Native desktop environment required for silent OAuth auto-refresh.',
     };
   },
+
+  async startOAuthLoopbackFlow(clientId?: string): Promise<{ success: boolean; auth_url: string; message: string }> {
+    if (isTauri()) {
+      return await invokeTauri('start_oauth_loopback_flow', { clientId });
+    }
+    return {
+      success: false,
+      auth_url: 'https://developers.google.com/oauthplayground',
+      message: 'Browser environment active. Open OAuth Playground to authorize.',
+    };
+  },
+
+  async queryDatabase(sqlQuery: string, connectionString?: string): Promise<{ success: boolean; rows: any[]; rows_affected: number; message: string }> {
+    if (isTauri()) {
+      return await invokeTauri('query_database', { sqlQuery, connectionString });
+    }
+    return {
+      success: true,
+      rows: [],
+      rows_affected: 0,
+      message: 'SQLite query simulated in browser environment.',
+    };
+  },
 };

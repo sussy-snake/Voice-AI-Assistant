@@ -7,21 +7,24 @@ import {
   CalendarCheck,
   Mic,
   Radio,
-  Zap,
   GitBranch,
   Mail,
   Database,
   ShieldCheck,
   User,
+  Sparkles,
 } from 'lucide-react';
 import { SystemStatus, LLMConfig, VoiceMode } from '../types';
 import { TauriBridge } from '../services/tauriBridge';
 import { TokenHealthService, OverallTokenHealth } from '../services/auth/tokenHealthService';
+import { AssistantLogo } from './AssistantLogo';
 
 interface HeaderProps {
   config: LLMConfig;
   voiceMode: VoiceMode;
   isListening: boolean;
+  isSpeaking: boolean;
+  volume: number;
   onOpenSettings: () => void;
   onOpenFileExplorer: () => void;
   onOpenTaskManager: () => void;
@@ -30,6 +33,7 @@ interface HeaderProps {
   onOpenRAGModal: () => void;
   onOpenTokenHealthModal: () => void;
   onOpenAccountModal: () => void;
+  onOpenResearchDrawer: () => void;
   onToggleVoiceMode: () => void;
 }
 
@@ -37,6 +41,8 @@ export const Header: React.FC<HeaderProps> = ({
   config,
   voiceMode,
   isListening,
+  isSpeaking,
+  volume,
   onOpenSettings,
   onOpenFileExplorer,
   onOpenTaskManager,
@@ -45,6 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenRAGModal,
   onOpenTokenHealthModal,
   onOpenAccountModal,
+  onOpenResearchDrawer,
   onToggleVoiceMode,
 }) => {
   const [stats, setStats] = useState<SystemStatus | null>(null);
@@ -78,7 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
     checkTokens();
 
     const interval = setInterval(fetchStats, 3000);
-    const tokenInterval = setInterval(checkTokens, 60000); // check tokens every minute
+    const tokenInterval = setInterval(checkTokens, 60000);
 
     return () => {
       clearInterval(interval);
@@ -87,38 +94,43 @@ export const Header: React.FC<HeaderProps> = ({
   }, [config]);
 
   const getCpuColor = (usage: number) => {
-    if (usage < 45) return 'text-accent-emerald border-accent-emerald/30 bg-accent-emerald/10';
-    if (usage < 75) return 'text-accent-amber border-accent-amber/30 bg-accent-amber/10';
-    return 'text-accent-rose border-accent-rose/30 bg-accent-rose/10';
+    if (usage < 45) return 'text-accent-emerald border-emerald-500/30 bg-emerald-950/40';
+    if (usage < 75) return 'text-accent-amber border-amber-500/30 bg-amber-950/40';
+    return 'text-accent-rose border-rose-500/30 bg-rose-950/40';
   };
 
   const getRamColor = (percent: number) => {
-    if (percent < 60) return 'text-accent-cyan border-accent-cyan/30 bg-accent-cyan/10';
-    if (percent < 85) return 'text-accent-amber border-accent-amber/30 bg-accent-amber/10';
-    return 'text-accent-rose border-accent-rose/30 bg-accent-rose/10';
+    if (percent < 60) return 'text-accent-cyan border-cyan-500/30 bg-cyan-950/40';
+    if (percent < 85) return 'text-accent-amber border-amber-500/30 bg-amber-950/40';
+    return 'text-accent-rose border-rose-500/30 bg-rose-950/40';
   };
 
   return (
-    <header className="flex items-center justify-between px-3.5 py-2.5 bg-surface/90 backdrop-blur-md border-b border-surfaceBorder select-none">
-      {/* Brand, Provider, and Token Health Pill */}
-      <div className="flex items-center space-x-2">
-        <div className="flex items-center space-x-1.5 font-bold tracking-tight text-white">
-          <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-brand-600 to-accent-cyan flex items-center justify-center shadow-sm shadow-brand-500/20">
-            <Zap className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="text-sm font-semibold tracking-wide">VoiceAI</span>
+    <header className="flex items-center justify-between px-4 py-3 bg-neutral-900/60 backdrop-blur-2xl border-b border-white/10 select-none z-30 relative shadow-xl">
+      {/* Brand & Assistant Logo */}
+      <div className="flex items-center space-x-2.5">
+        <div className="flex items-center space-x-2">
+          <AssistantLogo
+            size={30}
+            isListening={isListening}
+            isSpeaking={isSpeaking}
+            volume={volume}
+          />
+          <span className="text-sm font-bold tracking-wide bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            VoiceAI
+          </span>
         </div>
 
         {/* Model Badge */}
-        <div className="hidden sm:flex items-center px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-300">
-          <span className="w-1.5 h-1.5 rounded-full bg-brand-500 mr-1.5 animate-pulse"></span>
+        <div className="hidden sm:flex items-center px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-slate-300">
+          <span className="w-1.5 h-1.5 rounded-full bg-brand-400 mr-1.5 animate-pulse"></span>
           <span className="capitalize">{config.provider}</span>
         </div>
 
-        {/* Live Token Health Status Indicator */}
+        {/* Token Health Status Indicator */}
         <button
           onClick={onOpenTokenHealthModal}
-          className="hidden md:flex items-center px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 hover:border-slate-700 text-[10px] font-mono transition-all hover:scale-105"
+          className="hidden md:flex items-center px-2.5 py-0.5 rounded-full bg-white/5 border border-white/10 hover:border-white/20 text-[10px] font-mono transition-all hover:scale-105"
           title="Open Token Health Center"
         >
           <ShieldCheck
@@ -131,19 +143,24 @@ export const Header: React.FC<HeaderProps> = ({
           </span>
         </button>
 
-        {/* Voice RAG Pipeline Sub-200ms Badge */}
-        <div className="hidden lg:flex items-center px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-800/50 text-[10px] font-mono text-accent-emerald">
-          <span>⚡ RAG &lt;200ms</span>
-        </div>
+        {/* Workspace Research Quick Launcher */}
+        <button
+          onClick={onOpenResearchDrawer}
+          className="hidden lg:flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-cyan-950/50 border border-cyan-500/30 text-[10px] font-mono text-accent-cyan hover:bg-cyan-900/50 transition-all hover:scale-105"
+          title="Open Deep Workspace Research Hub"
+        >
+          <Sparkles className="w-3 h-3" />
+          <span>Research Engine</span>
+        </button>
       </div>
 
-      {/* Center Telemetry (G-Helper Style) */}
+      {/* Center Telemetry & Voice Mode */}
       <div className="flex items-center space-x-1.5">
         {stats && (
           <>
             {/* CPU Badge */}
             <div
-              className={`flex items-center space-x-1 px-2 py-0.5 rounded-md border text-[11px] font-mono font-medium transition-all ${getCpuColor(
+              className={`flex items-center space-x-1 px-2 py-0.5 rounded-lg border text-[11px] font-mono font-medium backdrop-blur-md transition-all ${getCpuColor(
                 stats.cpu_usage_percent
               )}`}
               title={`CPU: ${stats.cpu_brand} (${stats.cpu_cores} Cores)`}
@@ -154,7 +171,7 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* RAM Badge */}
             <div
-              className={`flex items-center space-x-1 px-2 py-0.5 rounded-md border text-[11px] font-mono font-medium transition-all ${getRamColor(
+              className={`flex items-center space-x-1 px-2 py-0.5 rounded-lg border text-[11px] font-mono font-medium backdrop-blur-md transition-all ${getRamColor(
                 stats.memory_usage_percent
               )}`}
               title={`RAM: ${Math.round(stats.used_memory_mb / 1024)}GB / ${Math.round(
@@ -170,18 +187,18 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Voice Mode Switcher */}
         <button
           onClick={onToggleVoiceMode}
-          className={`flex items-center space-x-1 px-2 py-0.5 rounded-md border text-[11px] font-medium transition-all hover:scale-105 active:scale-95 ${
+          className={`flex items-center space-x-1 px-2.5 py-0.5 rounded-lg border text-[11px] font-medium transition-all hover:scale-105 active:scale-95 ${
             isListening
-              ? 'bg-red-950/80 border-red-600 text-red-300 animate-pulse'
+              ? 'bg-rose-950/80 border-rose-500 text-rose-300 animate-pulse'
               : voiceMode === 'push-to-talk'
-              ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white'
-              : 'bg-brand-950/60 border-brand-700/60 text-brand-300 hover:bg-brand-900/60'
+              ? 'bg-white/10 border-white/15 text-slate-300 hover:text-white'
+              : 'bg-brand-950/70 border-brand-500/50 text-brand-300'
           }`}
-          title={`Click to switch mode (Current: ${voiceMode}, ${isListening ? 'Listening' : 'Idle'})`}
+          title={`Voice mode: ${voiceMode}`}
         >
           {voiceMode === 'push-to-talk' ? (
             <>
-              <Mic className={`w-3 h-3 ${isListening ? 'text-red-400' : 'text-slate-400'}`} />
+              <Mic className={`w-3 h-3 ${isListening ? 'text-rose-400' : 'text-slate-400'}`} />
               <span>PTT</span>
             </>
           ) : (
@@ -193,13 +210,22 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* Action Buttons */}
+      {/* Right Controls Action Bar */}
       <div className="flex items-center space-x-1">
-        {/* Account Profile & Google Connect Button */}
+        {/* Research Drawer Button */}
+        <button
+          onClick={onOpenResearchDrawer}
+          className="p-1.5 rounded-xl text-accent-cyan hover:bg-white/10 border border-transparent hover:border-white/10 transition-all hover:scale-105"
+          title="Deep Multi-File Workspace Research"
+        >
+          <Sparkles className="w-4 h-4" />
+        </button>
+
+        {/* Account Profile Button */}
         <button
           onClick={onOpenAccountModal}
-          className="p-1.5 rounded-lg text-brand-400 hover:text-brand-300 hover:bg-surfaceHover border border-brand-800/40 hover:border-brand-700 transition-all hover:scale-105"
-          title="Account Profile & Google Connect"
+          className="p-1.5 rounded-xl text-brand-400 hover:bg-white/10 border border-transparent hover:border-white/10 transition-all hover:scale-105"
+          title="Account Profile & 1-Click Google Connect"
         >
           <User className="w-4 h-4" />
         </button>
@@ -207,26 +233,26 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Token Health Center Button */}
         <button
           onClick={onOpenTokenHealthModal}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-emerald hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
-          title="Token Health Center & Self-Healing Credentials"
+          className="p-1.5 rounded-xl text-accent-emerald hover:bg-white/10 border border-transparent hover:border-white/10 transition-all hover:scale-105"
+          title="Token Health Center"
         >
-          <ShieldCheck className="w-4 h-4 text-accent-emerald" />
+          <ShieldCheck className="w-4 h-4" />
         </button>
 
         {/* Voice RAG Hub Button */}
         <button
           onClick={onOpenRAGModal}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-cyan hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
-          title="Voice-Enabled RAG Knowledge Hub (#RAGInGoa)"
+          className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 transition-all hover:scale-105"
+          title="Voice-Enabled RAG Knowledge Hub"
         >
-          <Database className="w-4 h-4 text-accent-cyan" />
+          <Database className="w-4 h-4" />
         </button>
 
         {/* GitHub Automation Button */}
         <button
           onClick={onOpenGitModal}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-cyan hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
-          title="Git & GitHub Hub (Create & Push Code)"
+          className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 transition-all hover:scale-105"
+          title="Git & GitHub Hub"
         >
           <GitBranch className="w-4 h-4" />
         </button>
@@ -234,7 +260,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Google Suite Button */}
         <button
           onClick={onOpenGoogleModal}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-rose hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
+          className="p-1.5 rounded-xl text-accent-rose hover:bg-white/10 border border-transparent hover:border-white/10 transition-all hover:scale-105"
           title="Google Suite (Gmail & Calendar)"
         >
           <Mail className="w-4 h-4" />
@@ -243,7 +269,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Filesystem Scanner */}
         <button
           onClick={onOpenFileExplorer}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
+          className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 transition-all hover:scale-105"
           title="Filesystem Scanner"
         >
           <FolderSearch className="w-4 h-4" />
@@ -252,7 +278,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* SQLite Task Scheduler */}
         <button
           onClick={onOpenTaskManager}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
+          className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 transition-all hover:scale-105"
           title="SQLite Task Scheduler"
         >
           <CalendarCheck className="w-4 h-4" />
@@ -261,7 +287,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Settings */}
         <button
           onClick={onOpenSettings}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
+          className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 border border-transparent hover:border-white/10 transition-all hover:scale-105"
           title="Settings & Model Configuration"
         >
           <Settings className="w-4 h-4" />

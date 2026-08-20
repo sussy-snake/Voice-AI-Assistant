@@ -103,13 +103,22 @@ export function useAgentOrchestrator(config: LLMConfig) {
         }
 
         // Gmail & Google Calendar
-        case 'gmail_send_message': {
+        case 'gmail_send_message':
+        case 'send_gmail_message': {
           resultData = await TauriBridge.gmailSendMessage({
             access_token: config.googleAccessToken || '',
             to: toolCall.arguments.to,
             subject: toolCall.arguments.subject,
             body: toolCall.arguments.body,
           });
+          break;
+        }
+
+        case 'query_database': {
+          resultData = await TauriBridge.queryDatabase(
+            toolCall.arguments.sql_query,
+            toolCall.arguments.connection_string
+          );
           break;
         }
 

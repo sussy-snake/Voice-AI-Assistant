@@ -99,6 +99,74 @@ pub async fn delete_task(
     Ok(true)
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DatabaseQueryResult {
+    pub success: bool,
+    pub rows: Vec<serde_json::Value>,
+    pub rows_affected: usize,
+    pub message: String,
+}
+
+#[tauri::command]
+pub async fn query_database(
+    _connection_string: Option<String>,
+    sql_query: String,
+    db: tauri::State<'_, Arc<Database>>,
+) -> Result<DatabaseQueryResult, String> {
+    if sql_query.trim().is_empty() {
+        return Err("SQL query cannot be empty".into());
+    }
+
+    let conn_guard = db.conn.lock().map_err(|e| e.to_string())?;
+    let trimmed_sql = sql_query.trim();
+
+    if trimmed_sql.to_uppercase().starts_with("SELECT") || trimmed_sql.to_uppercase().starts_with("PRAGMA") {
+        let mut stmt = conn_guard.prepare(trimmed_sql).map_err(|e| e.to_string())?;
+        let col_names: Vec<String> = stmt.column_names().into_iter().map(|s| s.to_string()).collect();
+
+        let rows = stmt
+            .query_map([], |row| {
+                let mut obj = serde_json::Map::new();
+                for (idx, name) in col_names.iter().enumerate() {
+                    let val_res = row.get_ref(idx);
+                    let json_val = match val_res {
+                        Ok(rusqlite::types::ValueRef::Null) => serde_json::Value::Null,
+                        Ok(rusqlite::types::ValueRef::Integer(i)) => serde_json::json!(i),
+                        Ok(rusqlite::types::ValueRef::Real(r)) => serde_json::json!(r),
+                        Ok(rusqlite::types::ValueRef::Text(t)) => serde_json::json!(String::from_utf8_lossy(t)),
+                        Ok(rusqlite::types::ValueRef::Blob(b)) => serde_json::json!(format!("<blob {} bytes>", b.len())),
+                        Err(_) => serde_json::Value::Null,
+                    };
+                    obj.insert(name.clone(), json_val);
+                }
+                Ok(serde_json::Value::Object(obj))
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut row_list = Vec::new();
+        for r in rows {
+            if let Ok(item) = r {
+                row_list.push(item);
+            }
+        }
+
+        Ok(DatabaseQueryResult {
+            success: true,
+            rows: row_list.clone(),
+            rows_affected: row_list.len(),
+            message: format!("Query executed successfully ({} rows returned).", row_list.len()),
+        })
+    } else {
+        let affected = conn_guard.execute(trimmed_sql, []).map_err(|e| e.to_string())?;
+        Ok(DatabaseQueryResult {
+            success: true,
+            rows: Vec::new(),
+            rows_affected: affected,
+            message: format!("Executed statement successfully ({} rows affected).", affected),
+        })
+    }
+}
+
 #[tauri::command]
 pub async fn send_desktop_notification(
     title: String,

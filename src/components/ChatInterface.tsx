@@ -604,88 +604,99 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <AudioVisualizer volume={volume} isListening={isListening} isSpeaking={isSpeaking} />
       </div>
 
-      {/* Input Control Console */}
-      <div className="p-3 bg-surface/90 border-t border-surfaceBorder">
-        <form onSubmit={handleSubmit} className="flex items-center space-x-2">
-          {/* Push-to-Talk / Mic Button */}
-          {voiceMode === 'push-to-talk' ? (
-            <button
-              type="button"
-              onMouseDown={onStartListening}
-              onMouseUp={onStopListening}
-              onTouchStart={onStartListening}
-              onTouchEnd={onStopListening}
-              className={`p-2.5 rounded-xl border transition-all ${
-                isListening
-                  ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/30 scale-105 animate-pulse'
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 hover:scale-105'
-              }`}
-              title="Hold to Speak (Push-to-Talk) or press Space"
-            >
-              <Mic className="w-4 h-4" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={isListening ? onStopListening : onStartListening}
-              className={`p-2.5 rounded-xl border transition-all ${
-                isListening
-                  ? 'bg-brand-600 border-brand-500 text-white shadow-lg shadow-brand-500/30 animate-pulse scale-105'
-                  : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:scale-105'
-              }`}
-              title={isListening ? 'Stop Continuous VAD' : 'Start Continuous VAD Listening'}
-            >
-              <Mic className="w-4 h-4" />
-            </button>
-          )}
-
-          {/* Text Input */}
-          <input
-            type="text"
-            value={inputVal}
-            onChange={(e) => setInputVal(e.target.value)}
-            placeholder={
-              isListening
-                ? 'Listening to speech...'
-                : voiceMode === 'push-to-talk'
-                ? 'Hold Space/Mic to speak, or ask RAG/Git/Google commands...'
-                : 'Type or speak naturally...'
-            }
-            disabled={isProcessing}
-            className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-colors"
-          />
-
-          {/* Stop Generation or Send Button */}
-          {isProcessing ? (
-            <button
-              type="button"
-              onClick={onStopGeneration}
-              className="p-2.5 rounded-xl bg-red-600/90 hover:bg-red-600 text-white border border-red-500 transition-colors"
-              title="Stop AI Generation"
-            >
-              <Square className="w-4 h-4 fill-white" />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={!inputVal.trim()}
-              className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-md shadow-brand-600/20 transition-all hover:scale-105 active:scale-95"
-              title="Send Command"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          )}
-
-          {/* Clear Chat Button */}
-          <button
-            type="button"
-            onClick={onClearChat}
-            className="p-2.5 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-slate-800/80 transition-colors hover:scale-105"
-            title="Clear Chat History"
+      {/* Input Control Console with Gemini Aurora "Thinking" Conic Glow Border */}
+      <div className="p-3 bg-neutral-900/60 backdrop-blur-2xl border-t border-white/10 relative z-10">
+        <div
+          className={`aurora-container transition-all duration-500 rounded-2xl ${
+            isProcessing || isListening || isSpeaking ? 'aurora-border-active p-[1.5px]' : ''
+          }`}
+        >
+          <form
+            onSubmit={handleSubmit}
+            className="flex items-center space-x-2 bg-slate-950/90 backdrop-blur-xl p-2 rounded-2xl border border-white/10 relative z-10 shadow-xl"
           >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </form>
+            {/* Push-to-Talk / Mic Button */}
+            {voiceMode === 'push-to-talk' ? (
+              <button
+                type="button"
+                onMouseDown={onStartListening}
+                onMouseUp={onStopListening}
+                onTouchStart={onStartListening}
+                onTouchEnd={onStopListening}
+                className={`p-2.5 rounded-xl border transition-all ${
+                  isListening
+                    ? 'bg-red-600 border-red-500 text-white shadow-lg shadow-red-500/30 scale-105 animate-pulse'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:bg-white/10 hover:scale-105'
+                }`}
+                title="Hold to Speak (Push-to-Talk) or press Space"
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={isListening ? onStopListening : onStartListening}
+                className={`p-2.5 rounded-xl border transition-all ${
+                  isListening
+                    ? 'bg-brand-600 border-brand-500 text-white shadow-lg shadow-brand-500/30 animate-pulse scale-105'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:text-white hover:scale-105'
+                }`}
+                title={isListening ? 'Stop Continuous VAD' : 'Start Continuous VAD Listening'}
+              >
+                <Mic className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Text Input */}
+            <input
+              type="text"
+              value={inputVal}
+              onChange={(e) => setInputVal(e.target.value)}
+              placeholder={
+                isListening
+                  ? 'Listening to speech...'
+                  : isProcessing
+                  ? 'Gemini Aurora generating response...'
+                  : voiceMode === 'push-to-talk'
+                  ? 'Hold Space/Mic to speak, or ask RAG/Git/Google/Research commands...'
+                  : 'Type or speak naturally...'
+              }
+              disabled={isProcessing}
+              className="flex-1 bg-transparent border-0 px-3 py-2 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition-colors"
+            />
+
+            {/* Stop Generation or Send Button */}
+            {isProcessing ? (
+              <button
+                type="button"
+                onClick={onStopGeneration}
+                className="p-2.5 rounded-xl bg-red-600/90 hover:bg-red-600 text-white border border-red-500 transition-colors shadow-lg shadow-red-500/20"
+                title="Stop AI Generation"
+              >
+                <Square className="w-4 h-4 fill-white" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!inputVal.trim()}
+                className="p-2.5 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-md shadow-brand-600/20 transition-all hover:scale-105 active:scale-95"
+                title="Send Command"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Clear Chat Button */}
+            <button
+              type="button"
+              onClick={onClearChat}
+              className="p-2.5 rounded-xl text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-colors hover:scale-105"
+              title="Clear Chat History"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

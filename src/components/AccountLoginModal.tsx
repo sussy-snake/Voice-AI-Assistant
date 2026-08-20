@@ -13,6 +13,7 @@ import {
 import { LLMConfig } from '../types';
 import { TokenHealthService } from '../services/auth/tokenHealthService';
 import { TokenExtractor } from '../services/auth/tokenExtractor';
+import { OAuthLoopbackClient } from '../services/auth/oauthLoopbackClient';
 
 interface AccountLoginModalProps {
   isOpen: boolean;
@@ -103,6 +104,28 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
     }
   };
 
+  const [isLoopbackListening, setIsLoopbackListening] = useState(false);
+
+  const handleStartLoopbackSignIn = async () => {
+    setIsLoopbackListening(true);
+    setStatusMsg('🚀 Loopback server started on http://127.0.0.1:8989/callback. Authorize in your browser...');
+
+    await OAuthLoopbackClient.startGoogleSignIn(
+      (tokens) => {
+        setIsLoopbackListening(false);
+        setGoogleAccessToken(tokens.access_token);
+        if (tokens.refresh_token) {
+          setGoogleRefreshToken(tokens.refresh_token);
+        }
+        setStatusMsg('🎉 Google Account Connected & Tokens Vaulted Successfully!');
+      },
+      (err) => {
+        setIsLoopbackListening(false);
+        setStatusMsg(`Notice: ${err}`);
+      }
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-surface border border-surfaceBorder rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
@@ -137,6 +160,31 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
               {statusMsg}
             </div>
           )}
+
+          {/* 🌐 1-Click Automated Google Sign-In with Loopback Server */}
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-950/70 to-indigo-950/70 border border-blue-500/40 space-y-2 shadow-lg">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-100 flex items-center space-x-1.5 text-blue-300">
+                <Sparkles className="w-4 h-4 text-blue-400" />
+                <span>🌐 1-Click Automated Google Sign-In</span>
+              </span>
+              <span className="text-[10px] text-blue-300 bg-blue-900/60 px-2 py-0.5 rounded-full border border-blue-400/30">
+                Port 8989 Loopback
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-300">
+              Launches your default browser, captures authorization tokens automatically via local loopback, and saves them to encrypted vault.
+            </p>
+            <button
+              type="button"
+              onClick={handleStartLoopbackSignIn}
+              disabled={isLoopbackListening}
+              className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center justify-center space-x-2 shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02] active:scale-98"
+            >
+              <Zap className={`w-4 h-4 ${isLoopbackListening ? 'animate-spin' : ''}`} />
+              <span>{isLoopbackListening ? 'Listening on 127.0.0.1:8989...' : 'Sign In with Google (Zero-Friction)'}</span>
+            </button>
+          </div>
 
           {/* ⚡ Instant 1-Click OAuth Link Parser Box */}
           <div className="p-3.5 rounded-xl bg-slate-900/90 border border-accent-cyan/40 space-y-2">

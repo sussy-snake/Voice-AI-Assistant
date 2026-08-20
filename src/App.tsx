@@ -12,6 +12,8 @@ import { GoogleIntegrationModal } from './components/GoogleIntegrationModal';
 import { RAGKnowledgeModal } from './components/RAGKnowledgeModal';
 import { TokenHealthModal } from './components/TokenHealthModal';
 import { AccountLoginModal } from './components/AccountLoginModal';
+import { ResearchDrawer } from './components/ResearchDrawer';
+import { CosmicCanvas } from './components/CosmicCanvas';
 import { isTauri } from './services/tauriBridge';
 import { initializePresetKnowledge } from './services/rag/presetKnowledge';
 import { TokenHealthService } from './services/auth/tokenHealthService';
@@ -36,8 +38,9 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
     'You have direct access to local system tools, grounded vector retrieval, and cloud integrations:\n' +
     '- `rag_retrieve`: Search indexed documents for grounded citations and facts.\n' +
     '- `git_create_repo` & `git_commit_and_push`: To manage GitHub repositories, stage, commit, and push code.\n' +
-    '- `gmail_send_message`, `gmail_list_messages`, `gmail_read_message`: Full Gmail management.\n' +
+    '- `gmail_send_message`, `send_gmail_message`, `gmail_list_messages`, `gmail_read_message`: Full Gmail management.\n' +
     '- `calendar_add_event`: To mark deadlines and exams on Google Calendar.\n' +
+    '- `query_database`: To execute SQL statements and query database tables.\n' +
     '- `scan_filesystem`: To locate user files, documents, codebases, and notes.\n' +
     '- `schedule_task`: To schedule local reminders with desktop notifications in SQLite.\n' +
     '- `run_hardware_compute`: To run parallel offline compute utilizing full CPU cores and NPU DirectML.\n' +
@@ -75,7 +78,7 @@ export function App() {
     }
   });
 
-  // Modal dialog states
+  // Modal & Drawer states
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(false);
   const [isTaskManagerOpen, setIsTaskManagerOpen] = useState(false);
@@ -84,6 +87,7 @@ export function App() {
   const [isRAGModalOpen, setIsRAGModalOpen] = useState(false);
   const [isTokenHealthOpen, setIsTokenHealthOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isResearchDrawerOpen, setIsResearchDrawerOpen] = useState(false);
 
   // Initialize preset RAG knowledge documents
   useEffect(() => {
@@ -97,7 +101,6 @@ export function App() {
 
       try {
         const googleStatus = await TokenHealthService.verifyGoogleToken(config.googleAccessToken || '');
-        // If expired or expiring in less than 5 mins, auto-refresh silently
         if (!googleStatus.isValid || googleStatus.isExpiringSoon) {
           const res = await TokenHealthService.refreshGoogleToken(config.googleRefreshToken);
           if (res.success && res.newAccessToken) {
@@ -113,7 +116,7 @@ export function App() {
     };
 
     autoRefreshDaemon();
-    const daemonInterval = setInterval(autoRefreshDaemon, 180000); // check every 3 mins
+    const daemonInterval = setInterval(autoRefreshDaemon, 180000);
 
     return () => clearInterval(daemonInterval);
   }, [config.googleAccessToken, config.googleRefreshToken]);
@@ -222,12 +225,17 @@ export function App() {
   }, []);
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-background text-slate-100 font-sans overflow-hidden">
-      {/* Sleek G-Helper Top Header with RAG, Token Health and Telemetry */}
+    <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 font-sans overflow-hidden relative">
+      {/* 🌌 High-Performance Interactive Cosmic Starfield Canvas */}
+      <CosmicCanvas />
+
+      {/* Sleek Liquid Glass Header with Dynamic Iridescent Assistant Logo */}
       <Header
         config={config}
         voiceMode={audioSettings.voiceMode}
         isListening={audioState.isListening}
+        isSpeaking={audioState.isSpeaking}
+        volume={audioState.volume}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenFileExplorer={() => setIsFileExplorerOpen(true)}
         onOpenTaskManager={() => setIsTaskManagerOpen(true)}
@@ -236,11 +244,12 @@ export function App() {
         onOpenRAGModal={() => setIsRAGModalOpen(true)}
         onOpenTokenHealthModal={() => setIsTokenHealthOpen(true)}
         onOpenAccountModal={() => setIsAccountModalOpen(true)}
+        onOpenResearchDrawer={() => setIsResearchDrawerOpen(true)}
         onToggleVoiceMode={toggleVoiceMode}
       />
 
-      {/* Main Chat & Voice Dashboard */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+      {/* Main Chat & Voice Dashboard with Gemini Aurora Conic Glow Border */}
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-10">
         <ChatInterface
           messages={messages}
           isProcessing={isProcessing}
@@ -258,7 +267,14 @@ export function App() {
         />
       </main>
 
-      {/* Modal Dialogs */}
+      {/* 📂 Deep Workspace Research Drawer */}
+      <ResearchDrawer
+        isOpen={isResearchDrawerOpen}
+        onClose={() => setIsResearchDrawerOpen(false)}
+        onSendToChat={sendMessage}
+      />
+
+      {/* 👤 Modal Dialogs */}
       <AccountLoginModal
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}

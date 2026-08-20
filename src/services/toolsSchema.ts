@@ -233,22 +233,43 @@ export const SYSTEM_TOOLS: ToolDefinition[] = [
     },
   },
   {
-    name: 'run_hardware_compute',
-    description: 'Executes heavy offline compute tasks utilizing 100% of CPU cores, AVX2 SIMD, and NPU neural acceleration.',
+    name: 'send_gmail_message',
+    description: 'Sends an email from your connected Google account to specified recipients via MIME formatting.',
     parameters: {
       type: 'object',
       properties: {
-        task_type: {
+        to: {
           type: 'string',
-          enum: ['prime_sieve', 'matrix_dot_product', 'vector_benchmark'],
-          description: 'Type of parallel compute task to execute.',
+          description: 'Recipient email address (e.g. bhooyash@gmail.com).',
         },
-        dataset_size: {
-          type: 'number',
-          description: 'Dataset size or computation iterations.',
+        subject: {
+          type: 'string',
+          description: 'Email subject line.',
+        },
+        body: {
+          type: 'string',
+          description: 'Body text content of the email.',
         },
       },
-      required: ['task_type'],
+      required: ['to', 'subject', 'body'],
+    },
+  },
+  {
+    name: 'query_database',
+    description: 'Executes read/write SQL queries against local SQLite database tables (e.g. tasks, notes, user schema).',
+    parameters: {
+      type: 'object',
+      properties: {
+        sql_query: {
+          type: 'string',
+          description: 'SQL statement to execute (e.g. "SELECT * FROM tasks WHERE is_completed = 0").',
+        },
+        connection_string: {
+          type: 'string',
+          description: 'Optional connection string or path for external database connector.',
+        },
+      },
+      required: ['sql_query'],
     },
   },
 ];

@@ -22,12 +22,16 @@ pub fn run() {
             commands::scanner::scan_filesystem,
             commands::scanner::open_file_path,
 
-            // SQLite Task Scheduler
+            // SQLite Task Scheduler & DB Queries
             commands::scheduler::schedule_task,
             commands::scheduler::list_tasks,
             commands::scheduler::toggle_task_completed,
             commands::scheduler::delete_task,
             commands::scheduler::send_desktop_notification,
+            commands::scheduler::query_database,
+
+            // Automated OAuth2 Loopback Authentication
+            commands::oauth_server::start_oauth_loopback_flow,
 
             // Hardware Telemetry & NPU Compute
             commands::system::system_status,
