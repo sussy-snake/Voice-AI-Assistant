@@ -264,16 +264,50 @@ export class LLMClient {
       },
     };
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bodyPayload),
-      signal,
-    });
+    let response: Response | null = null;
+    let lastErrorText = '';
 
-    if (!response.ok || !response.body) {
-      const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Gemini API Error (${response.status}): ${errorText}`);
+    const candidateUrls = apiKey
+      ? [
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?key=${apiKey}&alt=sse`,
+        ]
+      : [
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse`,
+        ];
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (!apiKey && googleToken) {
+      headers['Authorization'] = `Bearer ${googleToken}`;
+    }
+
+    for (const url of candidateUrls) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(bodyPayload),
+          signal,
+        });
+
+        if (res.ok && res.body) {
+          response = res;
+          break;
+        } else {
+          lastErrorText = await res.text().catch(() => res.statusText);
+        }
+      } catch (err: any) {
+        lastErrorText = err.message || 'Fetch error';
+      }
+    }
+
+    if (!response || !response.body) {
+      throw new Error(`Gemini API Error: ${lastErrorText}`);
     }
 
     const reader = response.body.getReader();
