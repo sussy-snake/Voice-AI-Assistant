@@ -288,24 +288,36 @@ export function getOpenAITools() {
 export function getGeminiFunctionDeclarations() {
   return [
     {
-      functionDeclarations: SYSTEM_TOOLS.map((t) => ({
-        name: t.name,
-        description: t.description,
-        parameters: {
-          type: 'OBJECT',
-          properties: Object.entries(t.parameters.properties).reduce((acc, [key, prop]) => {
-            const propType = prop.type === 'array' ? 'ARRAY' : prop.type === 'number' ? 'NUMBER' : prop.type.toUpperCase();
-            acc[key] = {
-              type: propType,
-              description: prop.description,
-              ...(prop.enum ? { enum: prop.enum } : {}),
-              ...(prop.type === 'array' ? { items: { type: 'STRING' } } : {}),
-            };
-            return acc;
-          }, {} as Record<string, any>),
-          required: t.parameters.required,
-        },
-      })),
+      functionDeclarations: SYSTEM_TOOLS.map((t) => {
+        const hasProperties = Object.keys(t.parameters.properties).length > 0;
+        return {
+          name: t.name,
+          description: t.description,
+          ...(hasProperties
+            ? {
+                parameters: {
+                  type: 'OBJECT',
+                  properties: Object.entries(t.parameters.properties).reduce((acc, [key, prop]) => {
+                    const propType =
+                      prop.type === 'array'
+                        ? 'ARRAY'
+                        : prop.type === 'number'
+                        ? 'NUMBER'
+                        : prop.type.toUpperCase();
+                    acc[key] = {
+                      type: propType,
+                      description: prop.description,
+                      ...(prop.enum ? { enum: prop.enum } : {}),
+                      ...(prop.type === 'array' ? { items: { type: 'STRING' } } : {}),
+                    };
+                    return acc;
+                  }, {} as Record<string, any>),
+                  required: t.parameters.required,
+                },
+              }
+            : {}),
+        };
+      }),
     },
   ];
 }

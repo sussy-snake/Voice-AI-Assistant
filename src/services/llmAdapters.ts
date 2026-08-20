@@ -34,12 +34,15 @@ export class LLMClient {
     messages: ChatMessage[],
     signal?: AbortSignal
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    let lastError: string | null = null;
+
     // 1. Primary Cloud Inference: Google Gemini 2.0 Flash
-    if (this.config.provider === 'gemini' && this.config.geminiApiKey?.trim()) {
+    if (this.config.geminiApiKey?.trim() || this.config.googleAccessToken?.trim()) {
       try {
         yield* this.streamGemini(messages, signal);
         return;
       } catch (err: any) {
+        lastError = err?.message || 'Gemini stream error';
         console.warn('Gemini stream failed, attempting local Ollama fallback:', err);
       }
     }
@@ -72,15 +75,16 @@ export class LLMClient {
     }
 
     // 4. Honest Unconfigured Guidance (Zero Mock Templates)
+    const errorPrefix = lastError ? `⚠️ **Gemini Notice:** *${lastError}*\n\n` : '';
     const notice =
-      '⚠️ **No LLM Engine Connected**\n\n' +
+      errorPrefix +
       'To enable real-time generative AI inference, please connect one of the following:\n\n' +
-      '1. **Google Gemini (Cloud — Recommended):**\n' +
-      '   - Click **Account Profile (👤)** or **Settings (⚙️)** in the top bar.\n' +
-      '   - Enter your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).\n\n' +
+      '1. **Google Gemini (Free Cloud AI — Recommended):**\n' +
+      '   - Click **Account Profile (👤)** in the top bar.\n' +
+      '   - Paste your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey) into the **Google Gemini API Key** box and click **Save**.\n\n' +
       '2. **Local Ollama / Llama (100% Offline):**\n' +
       '   - Run Ollama locally on your computer: `ollama run llama3.2` or `ollama run qwen2.5`.\n' +
-      '   - The assistant will automatically connect to `http://localhost:11434` without requiring any API keys!';
+      '   - The assistant will connect automatically to `http://localhost:11434`!';
 
     for (const word of notice.split(' ')) {
       yield { content: word + ' ', isDone: false };
@@ -182,13 +186,17 @@ export class LLMClient {
     messages: ChatMessage[],
     signal?: AbortSignal
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
-    const apiKey = this.config.geminiApiKey;
-    if (!apiKey) {
-      throw new Error('Gemini API key is missing.');
+    const apiKey = this.config.geminiApiKey?.trim();
+    const googleToken = this.config.googleAccessToken?.trim();
+
+    if (!apiKey && !googleToken) {
+      throw new Error('Google Gemini API Key is missing. Enter your key in Account Profile.');
     }
 
     const model = this.config.geminiModel || 'gemini-2.0-flash';
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
+    const endpoint = apiKey
+      ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`
+      : `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
 
     const filteredMessages = messages.filter((m) => m.id !== 'welcome');
     const firstUserIndex = filteredMessages.findIndex((m) => m.role === 'user');
