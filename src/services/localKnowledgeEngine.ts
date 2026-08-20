@@ -2,6 +2,7 @@ import { ChatMessage, ToolCall, GroundedCitation, LatencyTelemetry } from '../ty
 import { globalVectorStore } from './rag/vectorStore';
 import { GuardrailsEngine } from './rag/guardrailsEngine';
 import { initializePresetKnowledge } from './rag/presetKnowledge';
+import { IntelligentReasoningEngine } from './knowledge/intelligentReasoningEngine';
 
 export interface LocalEngineResponse {
   content: string;
@@ -56,17 +57,22 @@ export class LocalKnowledgeEngine {
     const senderName = 'Harsh';
 
     // -------------------------------------------------------------
-    // 1. Date & Time Queries
+    // 1. Strict Date & Time Queries (Avoid false matching queries with "today")
     // -------------------------------------------------------------
-    if (
-      query.includes('date') ||
-      query.includes('what day') ||
-      query.includes('today') ||
-      query.includes('time is it') ||
-      query.includes('current time') ||
-      query.includes('what year') ||
-      query.includes('what month')
-    ) {
+    const isStrictDateQuery =
+      query === 'what is the date' ||
+      query === 'what is the date today' ||
+      query === "what's the date" ||
+      query === 'what is today date' ||
+      query === "what's today's date" ||
+      query === 'what is the time' ||
+      query === 'what time is it' ||
+      query === 'current time' ||
+      query === 'tell me the date' ||
+      query === 'tell me the time' ||
+      query === 'what day is it';
+
+    if (isStrictDateQuery) {
       const elapsed = Math.round((performance.now() - tStart) * 10) / 10;
       return {
         content: `📅 **Today's Date & Time:**\n- **Date:** ${dateFormatted}\n- **Current Time:** ${timeFormatted}\n- **Timezone:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n\n*How can I help with your coding, RAG knowledge retrieval, or GitHub repos today?*`,
@@ -148,12 +154,12 @@ export class LocalKnowledgeEngine {
     if (
       query.includes('read email') ||
       query.includes('read mail') ||
-      query.includes('check email') ||
-      query.includes('check my email') ||
       query.includes('search email') ||
-      query.includes('inbox')
+      query.includes('search mail') ||
+      query.includes('list mail') ||
+      query.includes('find email')
     ) {
-      let searchQuery: string | undefined = undefined;
+      let searchQuery = '';
       if (query.includes('from ')) {
         searchQuery = `from:${query.split('from ')[1]?.split(' ')[0]}`;
       } else if (query.includes('unread')) {
@@ -291,12 +297,12 @@ export class LocalKnowledgeEngine {
     }
 
     // -------------------------------------------------------------
-    // 5. High-Performance Offline Problem-Solving Engine
+    // 5. Intelligent Reasoning Engine for General Knowledge / Financial / Coding Queries
     // -------------------------------------------------------------
-    // QuickSort & Sorting
-    if (query.includes('quicksort') || (query.includes('quick sort') && query.includes('complexity'))) {
+    const intelligentAnswer = IntelligentReasoningEngine.answerQuery(query, rawQuery);
+    if (intelligentAnswer) {
       return {
-        content: `### ⚡ QuickSort Complexity & Analysis\n\n- **Average-Case Time:** $\\mathcal{O}(N \\log N)$\n- **Best-Case Time:** $\\mathcal{O}(N \\log N)$ (when partition splits array in half)\n- **Worst-Case Time:** $\\mathcal{O}(N^2)$ (when already sorted and pivot is extreme element)\n- **Auxiliary Space:** $\\mathcal{O}(\\log N)$ (recursive call stack)\n\n#### Mitigating Worst-Case:\n1. **Randomized Pivot Selection**: Random index avoids adversarial inputs.\n2. **Median-of-Three**: Choose median of {first, middle, last}.\n3. **Dual-Pivot QuickSort**: Standard in Java \`Arrays.sort()\`.`,
+        content: intelligentAnswer.content,
         latencyTelemetry: {
           transcriptionMs: 19.5,
           retrievalMs: 1.8,
@@ -308,24 +314,9 @@ export class LocalKnowledgeEngine {
       };
     }
 
-    // Deadlock & Operating Systems
-    if (query.includes('deadlock') || query.includes('coffman')) {
-      return {
-        content: `### 🔒 Deadlock Coffman Conditions (Operating Systems)\n\nA deadlock occurs if and only if all **4 Coffman conditions** hold simultaneously:\n\n1. **Mutual Exclusion**: At least one resource is held non-shareably (only one process at a time).\n2. **Hold and Wait**: A process holds $\\ge 1$ resource while requesting others currently held by other processes.\n3. **No Preemption**: Resources cannot be confiscated; they must be released voluntarily by the holding process.\n4. **Circular Wait**: A closed chain $P_0 \\rightarrow P_1 \\rightarrow \\dots \\rightarrow P_n \\rightarrow P_0$ exists where each process waits for a resource held by the next.\n\n#### Deadlock Handling Techniques:\n- **Prevention**: Invalidate $\\ge 1$ Coffman condition (e.g. strict resource ordering).\n- **Avoidance**: Banker's Algorithm (Safe State detection).\n- **Detection & Recovery**: Resource Allocation Graph (RAG) cycle detection and process termination.`,
-        latencyTelemetry: {
-          transcriptionMs: 18.0,
-          retrievalMs: 1.5,
-          guardrailMs: 0.5,
-          generationMs: 40.1,
-          totalPipelineMs: 60.1,
-          p50Ms: 62.0,
-        },
-      };
-    }
-
-    // Default Intelligence response
+    // Default Fallback
     return {
-      content: `I've analyzed your query: **"${rawQuery}"**.\n\nI am your native **Voice AI Assistant & Grounded RAG Companion**. I can:\n- 📚 **Search indexed documents** with sub-200ms vector cosine retrieval.\n- 🐙 **Create & push repositories** to your GitHub profile.\n- ✉️ **Send emails and manage deadlines** on Google Calendar.\n- ⚡ **Execute parallel compute benchmarks** with NPU DirectML acceleration.\n\n*Speak or type any coding, OS, system, or knowledge question!*`,
+      content: `I've analyzed your query: **"${rawQuery}"**.\n\nI am your native **Voice AI Assistant & Grounded RAG Companion**.\n\n*Speak or type any coding, OS, system, or knowledge question!*`,
       latencyTelemetry: {
         transcriptionMs: 20.1,
         retrievalMs: retrievalMs,
