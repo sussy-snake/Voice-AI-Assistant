@@ -44,6 +44,7 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
   const [oauthUrlInput, setOauthUrlInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [isLoopbackListening, setIsLoopbackListening] = useState(false);
 
   if (!isOpen) return null;
 
@@ -103,8 +104,6 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
       setIsLoading(false);
     }
   };
-
-  const [isLoopbackListening, setIsLoopbackListening] = useState(false);
 
   const handleStartLoopbackSignIn = async () => {
     setIsLoopbackListening(true);
