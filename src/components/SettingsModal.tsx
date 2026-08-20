@@ -136,14 +136,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-slate-400 mb-1">Model Name</label>
-                    <input
-                      type="text"
-                      value={localConfig.geminiModel}
+                    <label className="block text-slate-400 mb-1">Gemini Model</label>
+                    <select
+                      value={localConfig.geminiModel || 'gemini-1.5-flash'}
                       onChange={(e) => setLocalConfig({ ...localConfig, geminiModel: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-white font-mono"
-                      placeholder="gemini-2.0-flash"
-                    />
+                      className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-white text-xs"
+                    >
+                      <option value="gemini-1.5-flash">gemini-1.5-flash (Recommended - Super Fast & 1M Context)</option>
+                      <option value="gemini-1.5-pro">gemini-1.5-pro (High Reasoning & Coding)</option>
+                      <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp (Experimental Next-Gen)</option>
+                    </select>
                   </div>
                 </div>
               )}
