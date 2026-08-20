@@ -75,7 +75,7 @@ export class LLMClient {
     messages: ChatMessage[],
     _reason: string
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
-    const response = LocalKnowledgeEngine.processQuery(messages, this.config);
+    const response = await LocalKnowledgeEngine.processQuery(messages, this.config);
 
     // Stream word deltas cleanly
     const words = response.content.split(' ');
