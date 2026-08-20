@@ -10,8 +10,10 @@ import { SettingsModal } from './components/SettingsModal';
 import { GitIntegrationModal } from './components/GitIntegrationModal';
 import { GoogleIntegrationModal } from './components/GoogleIntegrationModal';
 import { RAGKnowledgeModal } from './components/RAGKnowledgeModal';
+import { TokenHealthModal } from './components/TokenHealthModal';
 import { isTauri } from './services/tauriBridge';
 import { initializePresetKnowledge } from './services/rag/presetKnowledge';
+import { TokenHealthService } from './services/auth/tokenHealthService';
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
   provider: 'gemini',
@@ -78,11 +80,40 @@ export function App() {
   const [isGitModalOpen, setIsGitModalOpen] = useState(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [isRAGModalOpen, setIsRAGModalOpen] = useState(false);
+  const [isTokenHealthOpen, setIsTokenHealthOpen] = useState(false);
 
   // Initialize preset RAG knowledge documents
   useEffect(() => {
     initializePresetKnowledge();
   }, []);
+
+  // Background Self-Healing Token Auto-Refresh Daemon
+  useEffect(() => {
+    const autoRefreshDaemon = async () => {
+      if (!config.googleRefreshToken) return;
+
+      try {
+        const googleStatus = await TokenHealthService.verifyGoogleToken(config.googleAccessToken || '');
+        // If expired or expiring in less than 5 mins, auto-refresh silently
+        if (!googleStatus.isValid || googleStatus.isExpiringSoon) {
+          const res = await TokenHealthService.refreshGoogleToken(config.googleRefreshToken);
+          if (res.success && res.newAccessToken) {
+            console.info('Self-Healing Token Daemon: Auto-refreshed Google Access Token silently!');
+            const updated = { ...config, googleAccessToken: res.newAccessToken };
+            setConfig(updated);
+            localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
+          }
+        }
+      } catch (e) {
+        console.warn('Self-Healing Token Daemon warning:', e);
+      }
+    };
+
+    autoRefreshDaemon();
+    const daemonInterval = setInterval(autoRefreshDaemon, 180000); // check every 3 mins
+
+    return () => clearInterval(daemonInterval);
+  }, [config.googleAccessToken, config.googleRefreshToken]);
 
   // Initialize Agent Orchestrator
   const {
@@ -140,6 +171,12 @@ export function App() {
     localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
   };
 
+  const handleUpdateTokens = (newTokens: Partial<LLMConfig>) => {
+    const updated = { ...config, ...newTokens };
+    setConfig(updated);
+    localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
+  };
+
   const toggleVoiceMode = () => {
     const nextMode: VoiceMode = audioSettings.voiceMode === 'push-to-talk' ? 'voice-activated' : 'push-to-talk';
     const updated: AudioSettings = { ...audioSettings, voiceMode: nextMode };
@@ -163,7 +200,7 @@ export function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-background text-slate-100 font-sans overflow-hidden">
-      {/* Sleek G-Helper Top Header with RAG and Telemetry */}
+      {/* Sleek G-Helper Top Header with RAG, Token Health and Telemetry */}
       <Header
         config={config}
         voiceMode={audioSettings.voiceMode}
@@ -174,6 +211,7 @@ export function App() {
         onOpenGitModal={() => setIsGitModalOpen(true)}
         onOpenGoogleModal={() => setIsGoogleModalOpen(true)}
         onOpenRAGModal={() => setIsRAGModalOpen(true)}
+        onOpenTokenHealthModal={() => setIsTokenHealthOpen(true)}
         onToggleVoiceMode={toggleVoiceMode}
       />
 
@@ -204,6 +242,13 @@ export function App() {
         audioSettings={audioSettings}
         onSaveConfig={handleSaveConfig}
         onSaveAudioSettings={handleSaveAudioSettings}
+      />
+
+      <TokenHealthModal
+        isOpen={isTokenHealthOpen}
+        onClose={() => setIsTokenHealthOpen(false)}
+        config={config}
+        onUpdateTokens={handleUpdateTokens}
       />
 
       <RAGKnowledgeModal

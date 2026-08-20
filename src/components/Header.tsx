@@ -12,9 +12,11 @@ import {
   Mail,
   Activity,
   Database,
+  ShieldCheck,
 } from 'lucide-react';
 import { SystemStatus, LLMConfig, VoiceMode, HardwareComputeProfile } from '../types';
 import { TauriBridge } from '../services/tauriBridge';
+import { TokenHealthService, OverallTokenHealth } from '../services/auth/tokenHealthService';
 
 interface HeaderProps {
   config: LLMConfig;
@@ -26,6 +28,7 @@ interface HeaderProps {
   onOpenGitModal: () => void;
   onOpenGoogleModal: () => void;
   onOpenRAGModal: () => void;
+  onOpenTokenHealthModal: () => void;
   onToggleVoiceMode: () => void;
 }
 
@@ -39,10 +42,12 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenGitModal,
   onOpenGoogleModal,
   onOpenRAGModal,
+  onOpenTokenHealthModal,
   onToggleVoiceMode,
 }) => {
   const [stats, setStats] = useState<SystemStatus | null>(null);
   const [computeProfile, setComputeProfile] = useState<HardwareComputeProfile | null>(null);
+  const [tokenHealth, setTokenHealth] = useState<OverallTokenHealth | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -63,11 +68,32 @@ export const Header: React.FC<HeaderProps> = ({
       }
     };
 
+    const checkTokens = async () => {
+      try {
+        const health = await TokenHealthService.checkAllHealth({
+          githubToken: config.githubToken,
+          geminiApiKey: config.geminiApiKey,
+          googleAccessToken: config.googleAccessToken,
+          googleRefreshToken: config.googleRefreshToken,
+        });
+        setTokenHealth(health);
+      } catch {
+        // ignore
+      }
+    };
+
     fetchStats();
     fetchCompute();
+    checkTokens();
+
     const interval = setInterval(fetchStats, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    const tokenInterval = setInterval(checkTokens, 60000); // check tokens every minute
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(tokenInterval);
+    };
+  }, [config]);
 
   const getCpuColor = (usage: number) => {
     if (usage < 45) return 'text-accent-emerald border-accent-emerald/30 bg-accent-emerald/10';
@@ -83,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="flex items-center justify-between px-3.5 py-2.5 bg-surface/90 backdrop-blur-md border-b border-surfaceBorder select-none">
-      {/* Brand, Provider, and RAG Latency Pill */}
+      {/* Brand, Provider, and Token Health Pill */}
       <div className="flex items-center space-x-2">
         <div className="flex items-center space-x-1.5 font-bold tracking-tight text-white">
           <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-brand-600 to-accent-cyan flex items-center justify-center shadow-sm shadow-brand-500/20">
@@ -98,16 +124,21 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="capitalize">{config.provider}</span>
         </div>
 
-        {/* NPU / Hardware Acceleration Pill */}
-        {computeProfile && (
-          <div
-            className="hidden md:flex items-center px-2 py-0.5 rounded-full bg-slate-900 border border-brand-800/40 text-[10px] font-mono text-brand-300"
-            title={computeProfile.compute_mode}
-          >
-            <Activity className="w-3 h-3 text-accent-cyan mr-1 animate-pulse" />
-            <span>{computeProfile.npu_detected ? 'NPU Ready' : 'DirectML Accelerated'}</span>
-          </div>
-        )}
+        {/* Live Token Health Status Indicator */}
+        <button
+          onClick={onOpenTokenHealthModal}
+          className="hidden md:flex items-center px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 hover:border-slate-700 text-[10px] font-mono transition-all hover:scale-105"
+          title="Open Token Health Center"
+        >
+          <ShieldCheck
+            className={`w-3 h-3 mr-1 ${
+              tokenHealth?.allHealthy ? 'text-accent-emerald' : 'text-accent-amber'
+            }`}
+          />
+          <span className={tokenHealth?.allHealthy ? 'text-accent-emerald' : 'text-accent-amber'}>
+            {tokenHealth?.allHealthy ? 'Tokens: Healthy' : 'Tokens: Check'}
+          </span>
+        </button>
 
         {/* Voice RAG Pipeline Sub-200ms Badge */}
         <div className="hidden lg:flex items-center px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-800/50 text-[10px] font-mono text-accent-emerald">
@@ -173,6 +204,15 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Action Buttons */}
       <div className="flex items-center space-x-1">
+        {/* Token Health Center Button */}
+        <button
+          onClick={onOpenTokenHealthModal}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-emerald hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
+          title="Token Health Center & Self-Healing Credentials"
+        >
+          <ShieldCheck className="w-4 h-4 text-accent-emerald" />
+        </button>
+
         {/* Voice RAG Hub Button */}
         <button
           onClick={onOpenRAGModal}
