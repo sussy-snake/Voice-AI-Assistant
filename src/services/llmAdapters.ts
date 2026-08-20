@@ -193,15 +193,6 @@ export class LLMClient {
       throw new Error('Google Gemini API Key is missing. Enter your key in Account Profile.');
     }
 
-    let model = this.config.geminiModel || 'gemini-1.5-flash';
-    if (model === 'gemini-2.0-flash') {
-      model = 'gemini-1.5-flash';
-    }
-
-    const endpoint = apiKey
-      ? `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`
-      : `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`;
-
     const filteredMessages = messages.filter((m) => m.id !== 'welcome');
     const firstUserIndex = filteredMessages.findIndex((m) => m.role === 'user');
     const validMessages = firstUserIndex >= 0 ? filteredMessages.slice(firstUserIndex) : filteredMessages;
