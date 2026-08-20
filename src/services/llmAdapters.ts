@@ -203,7 +203,7 @@ export class LLMClient {
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:streamGenerateContent?key=${apiKey}&alt=sse`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
         ]
       : [
           `https://generativelanguage.googleapis.com/v1beta/models/${userModel}:streamGenerateContent?alt=sse`,
@@ -226,11 +226,10 @@ export class LLMClient {
 
         if (res.ok && res.body) {
           response = res;
-          console.info(`[Gemini] Active endpoint: ${url.split('?')[0]}`);
+          console.info(`[Gemini] Connected via: ${url.split('?')[0]}`);
           break;
         } else {
           lastErrorText = await res.text().catch(() => res.statusText);
-          console.warn(`[Gemini Attempt ${res.status}] ${url.split('?')[0]}:`, lastErrorText);
         }
       } catch (err: any) {
         lastErrorText = err.message || 'Fetch error';
@@ -309,25 +308,50 @@ export class LLMClient {
       })),
     ];
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.config.groqModel || 'llama-3.3-70b-versatile',
-        messages: formattedMessages,
-        tools: getOpenAITools(),
-        stream: true,
-        temperature: this.config.temperature || 0.7,
-      }),
-      signal,
-    });
+    const modelCandidates = [
+      this.config.groqModel || 'llama-3.1-8b-instant',
+      'llama-3.1-8b-instant',
+      'llama3-70b-8192',
+      'llama3-8b-8192',
+      'mixtral-8x7b-32768',
+      'gemma2-9b-it',
+    ];
 
-    if (!response.ok || !response.body) {
-      const err = await response.text().catch(() => response.statusText);
-      throw new Error(`Groq API Error (${response.status}): ${err}`);
+    let response: Response | null = null;
+    let lastErr = '';
+
+    for (const model of modelCandidates) {
+      try {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: formattedMessages,
+            tools: getOpenAITools(),
+            stream: true,
+            temperature: this.config.temperature || 0.7,
+          }),
+          signal,
+        });
+
+        if (res.ok && res.body) {
+          response = res;
+          console.info(`[Groq] Connected via: ${model}`);
+          break;
+        } else {
+          lastErr = await res.text().catch(() => res.statusText);
+        }
+      } catch (err: any) {
+        lastErr = err.message || 'Fetch error';
+      }
+    }
+
+    if (!response || !response.body) {
+      throw new Error(`Groq API Error: ${lastErr}`);
     }
 
     yield* this.consumeOpenAIStream(response.body);
