@@ -562,4 +562,51 @@ export const TauriBridge = {
     }
     return false;
   },
+
+  // -------------------------------------------------------------
+  // Self-Healing Auth & Token Health Bridge
+  // -------------------------------------------------------------
+  async authTestGitHubToken(token: string): Promise<{ is_valid: boolean; is_expiring_soon: boolean; message: string; details?: any }> {
+    if (isTauri()) {
+      return await invokeTauri('auth_test_github_token', { token });
+    }
+    return {
+      is_valid: Boolean(token && token.trim()),
+      is_expiring_soon: false,
+      message: token.trim() ? 'GitHub Token configured' : 'No GitHub token configured',
+    };
+  },
+
+  async authTestGeminiKey(apiKey: string): Promise<{ is_valid: boolean; is_expiring_soon: boolean; message: string; details?: any }> {
+    if (isTauri()) {
+      return await invokeTauri('auth_test_gemini_key', { apiKey });
+    }
+    return {
+      is_valid: Boolean(apiKey && apiKey.trim()),
+      is_expiring_soon: false,
+      message: apiKey.trim() ? 'Gemini 2.0 Flash Key configured' : 'No Gemini key configured',
+    };
+  },
+
+  async authTestGoogleToken(accessToken: string): Promise<{ is_valid: boolean; is_expiring_soon: boolean; expires_in_seconds?: number; message: string; details?: any }> {
+    if (isTauri()) {
+      return await invokeTauri('auth_test_google_token', { accessToken });
+    }
+    return {
+      is_valid: Boolean(accessToken && accessToken.trim()),
+      is_expiring_soon: false,
+      expires_in_seconds: 3600,
+      message: accessToken.trim() ? 'Google OAuth Token configured' : 'No Google OAuth token configured',
+    };
+  },
+
+  async authRefreshGoogleToken(refreshToken: string): Promise<{ success: boolean; access_token?: string; message: string }> {
+    if (isTauri()) {
+      return await invokeTauri('auth_refresh_google_token', { refreshToken });
+    }
+    return {
+      success: false,
+      message: 'Native desktop environment required for silent OAuth auto-refresh.',
+    };
+  },
 };

@@ -11,6 +11,7 @@ import { GitIntegrationModal } from './components/GitIntegrationModal';
 import { GoogleIntegrationModal } from './components/GoogleIntegrationModal';
 import { RAGKnowledgeModal } from './components/RAGKnowledgeModal';
 import { TokenHealthModal } from './components/TokenHealthModal';
+import { AccountLoginModal } from './components/AccountLoginModal';
 import { isTauri } from './services/tauriBridge';
 import { initializePresetKnowledge } from './services/rag/presetKnowledge';
 import { TokenHealthService } from './services/auth/tokenHealthService';
@@ -26,6 +27,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
   openaiModel: 'gpt-4o-mini',
   anthropicApiKey: '',
   anthropicModel: 'claude-3-5-sonnet-20241022',
+  userName: 'Harsh',
   githubToken: '',
   googleAccessToken: '',
   googleRefreshToken: '',
@@ -81,6 +83,7 @@ export function App() {
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
   const [isRAGModalOpen, setIsRAGModalOpen] = useState(false);
   const [isTokenHealthOpen, setIsTokenHealthOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   // Initialize preset RAG knowledge documents
   useEffect(() => {
@@ -177,6 +180,26 @@ export function App() {
     localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
   };
 
+  const handleSaveProfile = (profile: {
+    userName: string;
+    googleEmail?: string;
+    geminiApiKey?: string;
+    githubToken?: string;
+    googleAccessToken?: string;
+    googleRefreshToken?: string;
+  }) => {
+    const updated: LLMConfig = {
+      ...config,
+      userName: profile.userName,
+      geminiApiKey: profile.geminiApiKey || config.geminiApiKey,
+      githubToken: profile.githubToken || config.githubToken,
+      googleAccessToken: profile.googleAccessToken || config.googleAccessToken,
+      googleRefreshToken: profile.googleRefreshToken || config.googleRefreshToken,
+    };
+    setConfig(updated);
+    localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
+  };
+
   const toggleVoiceMode = () => {
     const nextMode: VoiceMode = audioSettings.voiceMode === 'push-to-talk' ? 'voice-activated' : 'push-to-talk';
     const updated: AudioSettings = { ...audioSettings, voiceMode: nextMode };
@@ -212,6 +235,7 @@ export function App() {
         onOpenGoogleModal={() => setIsGoogleModalOpen(true)}
         onOpenRAGModal={() => setIsRAGModalOpen(true)}
         onOpenTokenHealthModal={() => setIsTokenHealthOpen(true)}
+        onOpenAccountModal={() => setIsAccountModalOpen(true)}
         onToggleVoiceMode={toggleVoiceMode}
       />
 
@@ -235,6 +259,13 @@ export function App() {
       </main>
 
       {/* Modal Dialogs */}
+      <AccountLoginModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        config={config}
+        onSaveProfile={handleSaveProfile}
+      />
+
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}

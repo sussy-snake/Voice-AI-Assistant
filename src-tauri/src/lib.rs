@@ -47,6 +47,12 @@ pub fn run() {
             commands::google::calendar_add_event,
             commands::google::calendar_list_events,
 
+            // Self-Healing Auth & Token Health
+            commands::auth::auth_test_github_token,
+            commands::auth::auth_test_google_token,
+            commands::auth::auth_test_gemini_key,
+            commands::auth::auth_refresh_google_token,
+
             // Audio & VAD
             commands::audio::check_whisper_server,
             commands::audio::process_pcm_chunk,

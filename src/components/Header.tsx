@@ -12,6 +12,7 @@ import {
   Mail,
   Database,
   ShieldCheck,
+  User,
 } from 'lucide-react';
 import { SystemStatus, LLMConfig, VoiceMode } from '../types';
 import { TauriBridge } from '../services/tauriBridge';
@@ -28,6 +29,7 @@ interface HeaderProps {
   onOpenGoogleModal: () => void;
   onOpenRAGModal: () => void;
   onOpenTokenHealthModal: () => void;
+  onOpenAccountModal: () => void;
   onToggleVoiceMode: () => void;
 }
 
@@ -42,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenGoogleModal,
   onOpenRAGModal,
   onOpenTokenHealthModal,
+  onOpenAccountModal,
   onToggleVoiceMode,
 }) => {
   const [stats, setStats] = useState<SystemStatus | null>(null);
@@ -192,6 +195,15 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Action Buttons */}
       <div className="flex items-center space-x-1">
+        {/* Account Profile & Google Connect Button */}
+        <button
+          onClick={onOpenAccountModal}
+          className="p-1.5 rounded-lg text-brand-400 hover:text-brand-300 hover:bg-surfaceHover border border-brand-800/40 hover:border-brand-700 transition-all hover:scale-105"
+          title="Account Profile & Google Connect"
+        >
+          <User className="w-4 h-4" />
+        </button>
+
         {/* Token Health Center Button */}
         <button
           onClick={onOpenTokenHealthModal}
