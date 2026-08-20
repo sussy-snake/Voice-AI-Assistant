@@ -16,7 +16,6 @@ import { ResearchDrawer } from './components/ResearchDrawer';
 import { CosmicCanvas } from './components/CosmicCanvas';
 import { isTauri } from './services/tauriBridge';
 import { initializePresetKnowledge } from './services/rag/presetKnowledge';
-import { TokenHealthService } from './services/auth/tokenHealthService';
 import { BackgroundTokenDaemon } from './services/auth/backgroundTokenDaemon';
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
