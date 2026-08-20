@@ -14,9 +14,11 @@ import { TokenHealthModal } from './components/TokenHealthModal';
 import { AccountLoginModal } from './components/AccountLoginModal';
 import { ResearchDrawer } from './components/ResearchDrawer';
 import { CosmicCanvas } from './components/CosmicCanvas';
+import { OnboardingWizard } from './components/OnboardingWizard';
 import { isTauri } from './services/tauriBridge';
 import { initializePresetKnowledge } from './services/rag/presetKnowledge';
 import { BackgroundTokenDaemon } from './services/auth/backgroundTokenDaemon';
+import { CredentialVault } from './services/auth/credentialVault';
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
   provider: 'gemini',
@@ -88,6 +90,7 @@ export function App() {
   const [isTokenHealthOpen, setIsTokenHealthOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isResearchDrawerOpen, setIsResearchDrawerOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(() => !CredentialVault.hasCompletedSetup(config));
 
   // Initialize preset RAG knowledge documents and Autonomous Background Token Daemon
   useEffect(() => {
@@ -258,6 +261,16 @@ export function App() {
         isOpen={isResearchDrawerOpen}
         onClose={() => setIsResearchDrawerOpen(false)}
         onSendToChat={sendMessage}
+      />
+
+      {/* 🚀 First-Run Onboarding Wizard */}
+      <OnboardingWizard
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        config={config}
+        onComplete={(updated) => {
+          setConfig(updated);
+        }}
       />
 
       {/* 👤 Modal Dialogs */}
