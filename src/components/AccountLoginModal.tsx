@@ -53,7 +53,6 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
       if (extracted.accessToken) setGoogleAccessToken(extracted.accessToken);
       if (extracted.refreshToken) setGoogleRefreshToken(extracted.refreshToken);
       setStatusMsg(extracted.message);
-      setOauthUrlInput('');
     } else {
       setStatusMsg(`Notice: ${extracted.message}`);
     }
@@ -63,10 +62,11 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
+        setOauthUrlInput(text);
         handleExtractFromUrl(text);
       }
     } catch {
-      setStatusMsg('Please paste the OAuth link directly into the box below.');
+      setStatusMsg('Please paste the OAuth link directly into the box below (Ctrl+V).');
     }
   };
 
@@ -227,9 +227,16 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
                 <label className="block text-[10px] text-slate-400 mb-0.5">Access Token (ya29...)</label>
                 <input
                   type="password"
-                  placeholder="ya29.a0..."
+                  placeholder="ya29.a0... (or paste OAuth URL)"
                   value={googleAccessToken}
-                  onChange={(e) => setGoogleAccessToken(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.includes('oauthplayground') || val.includes('access_token=') || val.includes('refresh_token=')) {
+                      handleExtractFromUrl(val);
+                    } else {
+                      setGoogleAccessToken(val);
+                    }
+                  }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono text-[11px]"
                 />
               </div>
@@ -240,7 +247,14 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
                   type="password"
                   placeholder="1//04... (Enables Permanent Auto-Refresh)"
                   value={googleRefreshToken}
-                  onChange={(e) => setGoogleRefreshToken(e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.includes('oauthplayground') || val.includes('refresh_token=')) {
+                      handleExtractFromUrl(val);
+                    } else {
+                      setGoogleRefreshToken(val);
+                    }
+                  }}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono text-[11px]"
                 />
               </div>

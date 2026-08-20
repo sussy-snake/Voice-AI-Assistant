@@ -200,10 +200,20 @@ export class LocalKnowledgeEngine {
       const isFamily = isPapa || isMom || query.includes('son') || query.includes('sister') || query.includes('brother');
       const isFriend = query.includes('friend') || query.includes('buddy') || query.includes('bro') || query.includes('pal');
 
+      // Extract message intent following the email address
       let customAction = '';
-      const actionMatch = query.match(/(?:saying|telling|asking|message|tell|say)\s*(?:him|her|them)?\s*(?:to|that)?\s*(.+)/i);
-      if (actionMatch && actionMatch[1]) {
-        customAction = actionMatch[1].trim();
+      const afterEmailPart = query.split(recipient)[1] || '';
+      if (afterEmailPart.trim()) {
+        customAction = afterEmailPart
+          .replace(/^(?:\s*(?:saying|telling|asking|message|tell|say|to|that|about)?\s*(?:him|her|them)?\s*(?:to|that)?)+/i, '')
+          .trim();
+      }
+
+      if (!customAction) {
+        const actionMatch = query.match(/(?:saying|telling|asking|message|tell|say)\s*(?:him|her|them)?\s*(?:to|that)?\s*(.+)/i);
+        if (actionMatch && actionMatch[1]) {
+          customAction = actionMatch[1].trim();
+        }
       }
 
       if (isPapa) {
@@ -217,8 +227,8 @@ export class LocalKnowledgeEngine {
         body = `Hello,\n\nI wanted to share that I have created an automated AI assistant and am testing sending an email through it right now.\n\nWith love,\nYour Son (${senderName})`;
       } else if (customAction) {
         const capitalized = customAction.charAt(0).toUpperCase() + customAction.slice(1);
-        subject = `Update: ${capitalized}`;
-        body = `Hi,\n\nI am reaching out to let you know: ${customAction}.\n\nPlease let me know if you have any questions.\n\nBest regards,\n${senderName}`;
+        subject = `Important: ${capitalized}`;
+        body = `Hi,\n\nI am reaching out regarding: ${customAction}.\n\nPlease let me know if you have any questions.\n\nBest regards,\n${senderName}`;
       } else if (isFriend) {
         subject = 'Hey! Check this out (Sent via my AI Bot)';
         body = `Hey,\n\nI just built an automated AI agent for my local workstation and wanted to test sending an email through it to you!\n\nLet me know if you got this.\n\nCheers,\n${senderName}`;
