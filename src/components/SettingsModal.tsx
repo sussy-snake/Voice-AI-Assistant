@@ -99,8 +99,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white focus:outline-none focus:border-brand-500"
                 >
                   <option value="gemini">Google Gemini (Recommended - Free & Fast 1M Context)</option>
-                  <option value="ollama">Ollama (Local Offline LLM - llama3.1 / qwen2.5-coder)</option>
-                  <option value="openai">OpenAI (GPT-4o-mini / GPT-4o)</option>
+                  <option value="groq">Groq Cloud (Free Ultra-Fast Llama 3.3 70B & Qwen)</option>
+                  <option value="ollama">Ollama (100% Offline Localhost LLM)</option>
+                  <option value="openrouter">OpenRouter (Universal Cloud Aggregator)</option>
+                  <option value="openai">OpenAI (GPT-4o / GPT-4o-mini)</option>
                   <option value="llamacpp">Llama.cpp (Local GGUF Server)</option>
                   <option value="anthropic">Anthropic Claude (3.5 Sonnet)</option>
                 </select>
@@ -142,10 +144,95 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       onChange={(e) => setLocalConfig({ ...localConfig, geminiModel: e.target.value })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-white text-xs"
                     >
-                      <option value="gemini-1.5-flash">gemini-1.5-flash (Recommended - Super Fast & 1M Context)</option>
+                      <option value="gemini-1.5-flash">gemini-1.5-flash (Recommended - Super Fast)</option>
                       <option value="gemini-1.5-pro">gemini-1.5-pro (High Reasoning & Coding)</option>
-                      <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp (Experimental Next-Gen)</option>
                     </select>
+                  </div>
+                </div>
+              )}
+
+              {localConfig.provider === 'groq' && (
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-orange-800/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-orange-300 flex items-center space-x-1">
+                      <Zap className="w-3.5 h-3.5 text-orange-400" />
+                      <span>Groq Cloud Configuration</span>
+                    </span>
+                    <a
+                      href="https://console.groq.com/keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-1 text-orange-400 hover:underline text-[11px]"
+                    >
+                      <span>Get Free Groq Key</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Groq API Key</label>
+                    <input
+                      type="password"
+                      value={localConfig.groqApiKey || ''}
+                      onChange={(e) => setLocalConfig({ ...localConfig, groqApiKey: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-white font-mono"
+                      placeholder="gsk_..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Groq Model</label>
+                    <select
+                      value={localConfig.groqModel || 'llama-3.3-70b-versatile'}
+                      onChange={(e) => setLocalConfig({ ...localConfig, groqModel: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-white text-xs"
+                    >
+                      <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (Ultra Fast & Smart)</option>
+                      <option value="qwen-2.5-32b">qwen-2.5-32b (Top Coding & Math)</option>
+                      <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (Sub-100ms Ultra-Low Latency)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {localConfig.provider === 'openrouter' && (
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-purple-800/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-purple-300 flex items-center space-x-1">
+                      <Zap className="w-3.5 h-3.5 text-purple-400" />
+                      <span>OpenRouter Universal Configuration</span>
+                    </span>
+                    <a
+                      href="https://openrouter.ai/keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-1 text-purple-400 hover:underline text-[11px]"
+                    >
+                      <span>Get Free Key</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">OpenRouter API Key</label>
+                    <input
+                      type="password"
+                      value={localConfig.openrouterApiKey || ''}
+                      onChange={(e) => setLocalConfig({ ...localConfig, openrouterApiKey: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-white font-mono"
+                      placeholder="sk-or-v1-..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-400 mb-1">Model Name</label>
+                    <input
+                      type="text"
+                      value={localConfig.openrouterModel || 'meta-llama/llama-3.3-70b-instruct:free'}
+                      onChange={(e) => setLocalConfig({ ...localConfig, openrouterModel: e.target.value })}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-white font-mono text-xs"
+                      placeholder="meta-llama/llama-3.3-70b-instruct:free"
+                    />
                   </div>
                 </div>
               )}

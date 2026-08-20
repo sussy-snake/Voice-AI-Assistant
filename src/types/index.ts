@@ -1,4 +1,4 @@
-export type LLMProvider = 'ollama' | 'llamacpp' | 'gemini' | 'openai' | 'anthropic';
+export type LLMProvider = 'gemini' | 'groq' | 'ollama' | 'openrouter' | 'openai' | 'llamacpp' | 'anthropic';
 
 export type VoiceMode = 'push-to-talk' | 'voice-activated';
 
@@ -135,6 +135,10 @@ export interface LLMConfig {
   llamacppUrl: string;
   geminiApiKey: string;
   geminiModel: string;
+  groqApiKey?: string;
+  groqModel?: string;
+  openrouterApiKey?: string;
+  openrouterModel?: string;
   openaiApiKey: string;
   openaiModel: string;
   anthropicApiKey: string;

@@ -28,40 +28,61 @@ export class LLMClient {
   }
 
   /**
-   * Execute real generative AI inference with streaming, function calling, and dual cloud/local fallback.
+   * Execute real generative AI inference with cascading multi-provider fallback.
    */
   public async *streamChat(
     messages: ChatMessage[],
     signal?: AbortSignal
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
-    let lastError: string | null = null;
+    const errors: string[] = [];
 
-    // 1. Primary Cloud Inference: Google Gemini 2.0 Flash
-    if (this.config.geminiApiKey?.trim() || this.config.googleAccessToken?.trim()) {
+    // 1. Google Gemini (Official Cloud)
+    if (this.config.provider === 'gemini' || this.config.geminiApiKey?.trim() || this.config.googleAccessToken?.trim()) {
       try {
         yield* this.streamGemini(messages, signal);
         return;
       } catch (err: any) {
-        lastError = err?.message || 'Gemini stream error';
-        console.warn('Gemini stream failed, attempting local Ollama fallback:', err);
+        errors.push(`Gemini: ${err.message || err}`);
+        console.warn('Gemini stream failed, attempting next available provider:', err);
       }
     }
 
-    // 2. Localhost LLM Inference: Ollama (llama3.2 / qwen2.5 / mistral)
+    // 2. Groq Cloud (Free Ultra-Fast Cloud Fallback)
+    if (this.config.provider === 'groq' || this.config.groqApiKey?.trim()) {
+      try {
+        yield* this.streamGroq(messages, signal);
+        return;
+      } catch (err: any) {
+        errors.push(`Groq: ${err.message || err}`);
+        console.warn('Groq stream failed:', err);
+      }
+    }
+
+    // 3. Localhost Ollama (100% Offline)
     try {
       yield* this.streamOllama(messages, signal);
       return;
     } catch (ollamaErr: any) {
+      errors.push(`Ollama: ${ollamaErr.message || ollamaErr}`);
       console.warn('Ollama stream failed:', ollamaErr);
     }
 
-    // 3. OpenAI / Llama.cpp / Anthropic Providers
+    // 4. OpenRouter / OpenAI / Anthropic
+    if (this.config.provider === 'openrouter' || this.config.openrouterApiKey?.trim()) {
+      try {
+        yield* this.streamOpenRouter(messages, signal);
+        return;
+      } catch (err: any) {
+        errors.push(`OpenRouter: ${err.message || err}`);
+      }
+    }
+
     if (this.config.provider === 'openai' && this.config.openaiApiKey?.trim()) {
       try {
         yield* this.streamOpenAICompatible(messages, signal);
         return;
-      } catch (err) {
-        console.warn('OpenAI stream failed:', err);
+      } catch (err: any) {
+        errors.push(`OpenAI: ${err.message || err}`);
       }
     }
 
@@ -69,118 +90,32 @@ export class LLMClient {
       try {
         yield* this.streamAnthropic(messages, signal);
         return;
-      } catch (err) {
-        console.warn('Anthropic stream failed:', err);
+      } catch (err: any) {
+        errors.push(`Anthropic: ${err.message || err}`);
       }
     }
 
-    // 4. Honest Unconfigured Guidance (Zero Mock Templates)
-    const errorPrefix = lastError ? `⚠️ **Gemini Notice:** *${lastError}*\n\n` : '';
+    // 5. Honest Setup Notice
+    const errorDetails = errors.length > 0 ? `⚠️ **Provider Notices:**\n${errors.map((e) => `- ${e}`).join('\n')}\n\n` : '';
     const notice =
-      errorPrefix +
-      'To enable real-time generative AI inference, please connect one of the following:\n\n' +
-      '1. **Google Gemini (Free Cloud AI — Recommended):**\n' +
-      '   - Click **Account Profile (👤)** in the top bar.\n' +
-      '   - Paste your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey) into the **Google Gemini API Key** box and click **Save**.\n\n' +
-      '2. **Local Ollama / Llama (100% Offline):**\n' +
-      '   - Run Ollama locally on your computer: `ollama run llama3.2` or `ollama run qwen2.5`.\n' +
-      '   - The assistant will connect automatically to `http://localhost:11434`!';
+      errorDetails +
+      'To enable live generative AI inference, please connect one of the following:\n\n' +
+      '1. **Google Gemini (Recommended):**\n' +
+      '   - Paste your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey) in **Account Profile (👤)**.\n\n' +
+      '2. **Groq Cloud (Ultra-Fast Free):**\n' +
+      '   - Enter your free Groq API key in **Settings (⚙️)**.\n\n' +
+      '3. **Local Ollama (100% Offline):**\n' +
+      '   - Run Ollama locally: `ollama run llama3.2` on `http://localhost:11434`!';
 
     for (const word of notice.split(' ')) {
       yield { content: word + ' ', isDone: false };
-      await new Promise((r) => setTimeout(r, 12));
+      await new Promise((r) => setTimeout(r, 10));
     }
     yield { isDone: true };
   }
 
   // -------------------------------------------------------------
-  // Ollama Native Streamer (/api/chat)
-  // -------------------------------------------------------------
-  private async *streamOllama(
-    messages: ChatMessage[],
-    signal?: AbortSignal
-  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
-    const formattedMessages = [
-      { role: 'system', content: this.getEnrichedSystemPrompt() },
-      ...messages.map((m) => {
-        if (m.role === 'tool' && m.toolResults) {
-          return {
-            role: 'tool',
-            content: JSON.stringify(m.toolResults),
-          };
-        }
-        return {
-          role: m.role,
-          content: m.content,
-        };
-      }),
-    ];
-
-    const endpoint = `${(this.config.ollamaUrl || 'http://localhost:11434').replace(/\/$/, '')}/api/chat`;
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: this.config.ollamaModel || 'llama3.2',
-        messages: formattedMessages,
-        tools: getOpenAITools(),
-        stream: true,
-        options: {
-          temperature: this.config.temperature || 0.7,
-        },
-      }),
-      signal,
-    });
-
-    if (!response.ok || !response.body) {
-      const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`Ollama API Error (${response.status}): ${errorText}`);
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        try {
-          const item = JSON.parse(trimmed);
-          const contentDelta = item.message?.content || '';
-          const rawTools = item.message?.tool_calls;
-
-          let toolCalls: ToolCall[] | undefined = undefined;
-          if (rawTools && Array.isArray(rawTools)) {
-            toolCalls = rawTools.map((t: any) => ({
-              id: 'call_' + Math.random().toString(36).substring(2, 9),
-              name: t.function.name,
-              arguments: t.function.arguments,
-            }));
-          }
-
-          yield {
-            content: contentDelta,
-            toolCalls,
-            isDone: item.done || false,
-          };
-        } catch {
-          // ignore chunk parse errors
-        }
-      }
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Google Gemini Streamer (v1beta)
+  // Google Gemini Streamer (v1beta & v1 Stable)
   // -------------------------------------------------------------
   private async *streamGemini(
     messages: ChatMessage[],
@@ -258,23 +193,20 @@ export class LLMClient {
     let response: Response | null = null;
     let lastErrorText = '';
 
-    const userModel = (this.config.geminiModel || 'gemini-1.5-flash').trim().replace(/^models\//i, '');
+    const rawModel = this.config.geminiModel || 'gemini-1.5-flash';
+    const userModel = rawModel.trim().replace(/^models\//i, '');
 
     const candidateUrls = apiKey
       ? [
           `https://generativelanguage.googleapis.com/v1beta/models/${userModel}:streamGenerateContent?key=${apiKey}&alt=sse`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:streamGenerateContent?key=${apiKey}&alt=sse`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:streamGenerateContent?key=${apiKey}&alt=sse`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=${apiKey}&alt=sse`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?key=${apiKey}&alt=sse`,
         ]
       : [
           `https://generativelanguage.googleapis.com/v1beta/models/${userModel}:streamGenerateContent?alt=sse`,
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse`,
         ];
 
@@ -294,20 +226,18 @@ export class LLMClient {
 
         if (res.ok && res.body) {
           response = res;
-          console.info(`[Gemini] Connected successfully via: ${url.split('?')[0]}`);
+          console.info(`[Gemini] Active endpoint: ${url.split('?')[0]}`);
           break;
         } else {
           lastErrorText = await res.text().catch(() => res.statusText);
-          console.warn(`[Gemini Candidate Failed ${res.status}] ${url.split('?')[0]}:`, lastErrorText);
+          console.warn(`[Gemini Attempt ${res.status}] ${url.split('?')[0]}:`, lastErrorText);
         }
       } catch (err: any) {
         lastErrorText = err.message || 'Fetch error';
-        console.warn(`[Gemini Candidate Network Error] ${url.split('?')[0]}:`, err);
       }
     }
 
     if (!response || !response.body) {
-      console.error('[Gemini All Candidates Exhausted]', { lastErrorText });
       throw new Error(`Gemini API Error: ${lastErrorText}`);
     }
 
@@ -353,7 +283,181 @@ export class LLMClient {
             isDone: candidate?.finishReason === 'STOP',
           };
         } catch {
-          // ignore parsing error for chunk
+          // ignore
+        }
+      }
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Groq Cloud Streamer (OpenAI Compatible)
+  // -------------------------------------------------------------
+  private async *streamGroq(
+    messages: ChatMessage[],
+    signal?: AbortSignal
+  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    const apiKey = this.config.groqApiKey?.trim();
+    if (!apiKey) {
+      throw new Error('Groq API key is missing.');
+    }
+
+    const formattedMessages = [
+      { role: 'system', content: this.getEnrichedSystemPrompt() },
+      ...messages.map((m) => ({
+        role: m.role === 'tool' ? 'tool' : m.role,
+        content: m.content || '',
+      })),
+    ];
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.config.groqModel || 'llama-3.3-70b-versatile',
+        messages: formattedMessages,
+        tools: getOpenAITools(),
+        stream: true,
+        temperature: this.config.temperature || 0.7,
+      }),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const err = await response.text().catch(() => response.statusText);
+      throw new Error(`Groq API Error (${response.status}): ${err}`);
+    }
+
+    yield* this.consumeOpenAIStream(response.body);
+  }
+
+  // -------------------------------------------------------------
+  // OpenRouter Streamer (OpenAI Compatible)
+  // -------------------------------------------------------------
+  private async *streamOpenRouter(
+    messages: ChatMessage[],
+    signal?: AbortSignal
+  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    const apiKey = this.config.openrouterApiKey?.trim();
+    if (!apiKey) {
+      throw new Error('OpenRouter API key is missing.');
+    }
+
+    const formattedMessages = [
+      { role: 'system', content: this.getEnrichedSystemPrompt() },
+      ...messages.map((m) => ({
+        role: m.role === 'tool' ? 'tool' : m.role,
+        content: m.content || '',
+      })),
+    ];
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.config.openrouterModel || 'meta-llama/llama-3.3-70b-instruct:free',
+        messages: formattedMessages,
+        tools: getOpenAITools(),
+        stream: true,
+        temperature: this.config.temperature || 0.7,
+      }),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const err = await response.text().catch(() => response.statusText);
+      throw new Error(`OpenRouter API Error (${response.status}): ${err}`);
+    }
+
+    yield* this.consumeOpenAIStream(response.body);
+  }
+
+  // -------------------------------------------------------------
+  // Ollama Native Streamer (/api/chat)
+  // -------------------------------------------------------------
+  private async *streamOllama(
+    messages: ChatMessage[],
+    signal?: AbortSignal
+  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    const formattedMessages = [
+      { role: 'system', content: this.getEnrichedSystemPrompt() },
+      ...messages.map((m) => {
+        if (m.role === 'tool' && m.toolResults) {
+          return {
+            role: 'tool',
+            content: JSON.stringify(m.toolResults),
+          };
+        }
+        return {
+          role: m.role,
+          content: m.content,
+        };
+      }),
+    ];
+
+    const endpoint = `${(this.config.ollamaUrl || 'http://localhost:11434').replace(/\/$/, '')}/api/chat`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: this.config.ollamaModel || 'llama3.2',
+        messages: formattedMessages,
+        tools: getOpenAITools(),
+        stream: true,
+        options: {
+          temperature: this.config.temperature || 0.7,
+        },
+      }),
+      signal,
+    });
+
+    if (!response.ok || !response.body) {
+      const errorText = await response.text().catch(() => response.statusText);
+      throw new Error(`Ollama Error (${response.status}): ${errorText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        try {
+          const item = JSON.parse(trimmed);
+          const contentDelta = item.message?.content || '';
+          const rawTools = item.message?.tool_calls;
+
+          let toolCalls: ToolCall[] | undefined = undefined;
+          if (rawTools && Array.isArray(rawTools)) {
+            toolCalls = rawTools.map((t: any) => ({
+              id: 'call_' + Math.random().toString(36).substring(2, 9),
+              name: t.function.name,
+              arguments: t.function.arguments,
+            }));
+          }
+
+          yield {
+            content: contentDelta,
+            toolCalls,
+            isDone: item.done || false,
+          };
+        } catch {
+          // ignore
         }
       }
     }
@@ -376,12 +480,6 @@ export class LLMClient {
       ...messages.map((m) => ({
         role: m.role === 'tool' ? 'tool' : m.role,
         content: m.content || '',
-        ...(m.toolResults
-          ? {
-              tool_call_id: m.toolResults[0]?.toolCallId,
-              name: m.toolResults[0]?.name,
-            }
-          : {}),
       })),
     ];
 
@@ -411,7 +509,14 @@ export class LLMClient {
       throw new Error(`OpenAI-compatible Error (${response.status}): ${errorText}`);
     }
 
-    const reader = response.body.getReader();
+    yield* this.consumeOpenAIStream(response.body);
+  }
+
+  // -------------------------------------------------------------
+  // Helper: Consume SSE chunks from OpenAI-compatible streams
+  // -------------------------------------------------------------
+  private async *consumeOpenAIStream(body: ReadableStream<Uint8Array>): AsyncGenerator<LLMResponseChunk, void, unknown> {
+    const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
