@@ -273,10 +273,12 @@ export function getGeminiFunctionDeclarations() {
         parameters: {
           type: 'OBJECT',
           properties: Object.entries(t.parameters.properties).reduce((acc, [key, prop]) => {
+            const propType = prop.type === 'array' ? 'ARRAY' : prop.type === 'number' ? 'NUMBER' : prop.type.toUpperCase();
             acc[key] = {
-              type: prop.type === 'array' ? 'ARRAY' : prop.type.toUpperCase(),
+              type: propType,
               description: prop.description,
               ...(prop.enum ? { enum: prop.enum } : {}),
+              ...(prop.type === 'array' ? { items: { type: 'STRING' } } : {}),
             };
             return acc;
           }, {} as Record<string, any>),

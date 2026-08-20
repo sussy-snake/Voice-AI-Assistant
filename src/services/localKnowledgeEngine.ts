@@ -19,9 +19,17 @@ export class LocalKnowledgeEngine {
     const tStart = performance.now();
     initializePresetKnowledge();
 
-    // If the last message in history is a tool result, do NOT re-generate tool calls!
+    // If the last message in history is a tool result, report actual result!
     const lastMsg = messages[messages.length - 1];
     if (lastMsg && (lastMsg.role === 'tool' || (lastMsg.toolResults && lastMsg.toolResults.length > 0))) {
+      const results = lastMsg.toolResults || [];
+      const hasError = results.some((r) => r.error);
+      if (hasError) {
+        const errDetails = results.map((r) => r.error).filter(Boolean).join(', ');
+        return {
+          content: `⚠️ **Action Failed:** ${errDetails}\n\n*Please check your Google OAuth credentials in Google Suite (✉️) or Account Profile (👤).*`,
+        };
+      }
       return {
         content: '✅ All requested operations have been executed and saved.',
       };
@@ -192,6 +200,12 @@ export class LocalKnowledgeEngine {
       const isFamily = isPapa || isMom || query.includes('son') || query.includes('sister') || query.includes('brother');
       const isFriend = query.includes('friend') || query.includes('buddy') || query.includes('bro') || query.includes('pal');
 
+      let customAction = '';
+      const actionMatch = query.match(/(?:saying|telling|asking|message|tell|say)\s*(?:him|her|them)?\s*(?:to|that)?\s*(.+)/i);
+      if (actionMatch && actionMatch[1]) {
+        customAction = actionMatch[1].trim();
+      }
+
       if (isPapa) {
         subject = 'Exciting News! Message from your son (Automated AI Bot)';
         body = `Dear Papa,\n\nI hope you are doing well! I wanted to share something really exciting with you—your son has created an automated AI assistant and I am sending this email directly through it right now!\n\nEverything is working smoothly and I wanted you to see what I built.\n\nWith lots of love and respect,\nYour Son (${senderName})`;
@@ -201,6 +215,10 @@ export class LocalKnowledgeEngine {
       } else if (isFamily) {
         subject = 'Message from your son (Voice AI Assistant)';
         body = `Hello,\n\nI wanted to share that I have created an automated AI assistant and am testing sending an email through it right now.\n\nWith love,\nYour Son (${senderName})`;
+      } else if (customAction) {
+        const capitalized = customAction.charAt(0).toUpperCase() + customAction.slice(1);
+        subject = `Update: ${capitalized}`;
+        body = `Hi,\n\nI am reaching out to let you know: ${customAction}.\n\nPlease let me know if you have any questions.\n\nBest regards,\n${senderName}`;
       } else if (isFriend) {
         subject = 'Hey! Check this out (Sent via my AI Bot)';
         body = `Hey,\n\nI just built an automated AI agent for my local workstation and wanted to test sending an email through it to you!\n\nLet me know if you got this.\n\nCheers,\n${senderName}`;
