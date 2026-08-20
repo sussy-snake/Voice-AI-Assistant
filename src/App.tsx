@@ -9,7 +9,9 @@ import { FileExplorerModal } from './components/FileExplorerModal';
 import { SettingsModal } from './components/SettingsModal';
 import { GitIntegrationModal } from './components/GitIntegrationModal';
 import { GoogleIntegrationModal } from './components/GoogleIntegrationModal';
+import { RAGKnowledgeModal } from './components/RAGKnowledgeModal';
 import { isTauri } from './services/tauriBridge';
+import { initializePresetKnowledge } from './services/rag/presetKnowledge';
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
   provider: 'gemini',
@@ -24,17 +26,19 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
   anthropicModel: 'claude-3-5-sonnet-20241022',
   githubToken: '',
   googleAccessToken: '',
+  googleRefreshToken: '',
   systemPrompt:
-    'You are a high-performance local AI Companion and Computer Science Assistant styled after G-Helper.\n' +
-    'You have direct access to local system tools and cloud integrations:\n' +
+    'You are a high-performance local AI Companion, Voice RAG Engine, and Computer Science Assistant styled after G-Helper.\n' +
+    'You have direct access to local system tools, grounded vector retrieval, and cloud integrations:\n' +
+    '- `rag_retrieve`: Search indexed documents for grounded citations and facts.\n' +
     '- `git_create_repo` & `git_commit_and_push`: To manage GitHub repositories, stage, commit, and push code.\n' +
-    '- `gmail_send_message`: To send emails via Gmail.\n' +
+    '- `gmail_send_message`, `gmail_list_messages`, `gmail_read_message`: Full Gmail management.\n' +
     '- `calendar_add_event`: To mark deadlines and exams on Google Calendar.\n' +
     '- `scan_filesystem`: To locate user files, documents, codebases, and notes.\n' +
     '- `schedule_task`: To schedule local reminders with desktop notifications in SQLite.\n' +
     '- `run_hardware_compute`: To run parallel offline compute utilizing full CPU cores and NPU DirectML.\n' +
     '- `system_status`: To inspect live CPU load, RAM usage, and disk storage.\n\n' +
-    'Be concise, intelligent, and execute appropriate tools directly when requested by the user.',
+    'Be concise, intelligent, empathetic, and execute appropriate tools directly when requested by the user.',
   temperature: 0.7,
 };
 
@@ -73,6 +77,12 @@ export function App() {
   const [isTaskManagerOpen, setIsTaskManagerOpen] = useState(false);
   const [isGitModalOpen, setIsGitModalOpen] = useState(false);
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [isRAGModalOpen, setIsRAGModalOpen] = useState(false);
+
+  // Initialize preset RAG knowledge documents
+  useEffect(() => {
+    initializePresetKnowledge();
+  }, []);
 
   // Initialize Agent Orchestrator
   const {
@@ -153,7 +163,7 @@ export function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-background text-slate-100 font-sans overflow-hidden">
-      {/* Sleek G-Helper Top Header */}
+      {/* Sleek G-Helper Top Header with RAG and Telemetry */}
       <Header
         config={config}
         voiceMode={audioSettings.voiceMode}
@@ -163,6 +173,7 @@ export function App() {
         onOpenTaskManager={() => setIsTaskManagerOpen(true)}
         onOpenGitModal={() => setIsGitModalOpen(true)}
         onOpenGoogleModal={() => setIsGoogleModalOpen(true)}
+        onOpenRAGModal={() => setIsRAGModalOpen(true)}
         onToggleVoiceMode={toggleVoiceMode}
       />
 
@@ -193,6 +204,11 @@ export function App() {
         audioSettings={audioSettings}
         onSaveConfig={handleSaveConfig}
         onSaveAudioSettings={handleSaveAudioSettings}
+      />
+
+      <RAGKnowledgeModal
+        isOpen={isRAGModalOpen}
+        onClose={() => setIsRAGModalOpen(false)}
       />
 
       <GitIntegrationModal

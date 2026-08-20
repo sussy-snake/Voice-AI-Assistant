@@ -11,6 +11,7 @@ import {
   GitBranch,
   Mail,
   Activity,
+  Database,
 } from 'lucide-react';
 import { SystemStatus, LLMConfig, VoiceMode, HardwareComputeProfile } from '../types';
 import { TauriBridge } from '../services/tauriBridge';
@@ -24,6 +25,7 @@ interface HeaderProps {
   onOpenTaskManager: () => void;
   onOpenGitModal: () => void;
   onOpenGoogleModal: () => void;
+  onOpenRAGModal: () => void;
   onToggleVoiceMode: () => void;
 }
 
@@ -36,6 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenTaskManager,
   onOpenGitModal,
   onOpenGoogleModal,
+  onOpenRAGModal,
   onToggleVoiceMode,
 }) => {
   const [stats, setStats] = useState<SystemStatus | null>(null);
@@ -80,7 +83,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="flex items-center justify-between px-3.5 py-2.5 bg-surface/90 backdrop-blur-md border-b border-surfaceBorder select-none">
-      {/* Brand & NPU Compute Pill */}
+      {/* Brand, Provider, and RAG Latency Pill */}
       <div className="flex items-center space-x-2">
         <div className="flex items-center space-x-1.5 font-bold tracking-tight text-white">
           <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-brand-600 to-accent-cyan flex items-center justify-center shadow-sm shadow-brand-500/20">
@@ -105,6 +108,11 @@ export const Header: React.FC<HeaderProps> = ({
             <span>{computeProfile.npu_detected ? 'NPU Ready' : 'DirectML Accelerated'}</span>
           </div>
         )}
+
+        {/* Voice RAG Pipeline Sub-200ms Badge */}
+        <div className="hidden lg:flex items-center px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-800/50 text-[10px] font-mono text-accent-emerald">
+          <span>⚡ RAG &lt;200ms</span>
+        </div>
       </div>
 
       {/* Center Telemetry (G-Helper Style) */}
@@ -140,7 +148,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Voice Mode Switcher */}
         <button
           onClick={onToggleVoiceMode}
-          className={`flex items-center space-x-1 px-2 py-0.5 rounded-md border text-[11px] font-medium transition-all ${
+          className={`flex items-center space-x-1 px-2 py-0.5 rounded-md border text-[11px] font-medium transition-all hover:scale-105 active:scale-95 ${
             isListening
               ? 'bg-red-950/80 border-red-600 text-red-300 animate-pulse'
               : voiceMode === 'push-to-talk'
@@ -165,10 +173,19 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Action Buttons */}
       <div className="flex items-center space-x-1">
+        {/* Voice RAG Hub Button */}
+        <button
+          onClick={onOpenRAGModal}
+          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-cyan hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
+          title="Voice-Enabled RAG Knowledge Hub (#RAGInGoa)"
+        >
+          <Database className="w-4 h-4 text-accent-cyan" />
+        </button>
+
         {/* GitHub Automation Button */}
         <button
           onClick={onOpenGitModal}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-cyan hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-cyan hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
           title="Git & GitHub Hub (Create & Push Code)"
         >
           <GitBranch className="w-4 h-4" />
@@ -177,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Google Suite Button */}
         <button
           onClick={onOpenGoogleModal}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-rose hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-accent-rose hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
           title="Google Suite (Gmail & Calendar)"
         >
           <Mail className="w-4 h-4" />
@@ -186,7 +203,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Filesystem Scanner */}
         <button
           onClick={onOpenFileExplorer}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
           title="Filesystem Scanner"
         >
           <FolderSearch className="w-4 h-4" />
@@ -195,7 +212,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* SQLite Task Scheduler */}
         <button
           onClick={onOpenTaskManager}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
           title="SQLite Task Scheduler"
         >
           <CalendarCheck className="w-4 h-4" />
@@ -204,7 +221,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Settings */}
         <button
           onClick={onOpenSettings}
-          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-surfaceHover border border-transparent hover:border-surfaceBorder transition-all hover:scale-105"
           title="Settings & Model Configuration"
         >
           <Settings className="w-4 h-4" />

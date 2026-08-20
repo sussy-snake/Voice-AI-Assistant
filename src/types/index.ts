@@ -160,6 +160,23 @@ export interface ToolResult {
   error?: string;
 }
 
+export interface GroundedCitation {
+  chunkId: string;
+  sourceName: string;
+  chunkIndex: number;
+  similarityScore: number;
+  snippet: string;
+}
+
+export interface LatencyTelemetry {
+  transcriptionMs: number;
+  retrievalMs: number;
+  guardrailMs: number;
+  generationMs: number;
+  totalPipelineMs: number;
+  p50Ms?: number;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'tool';
@@ -167,6 +184,9 @@ export interface ChatMessage {
   timestamp: string;
   toolCalls?: ToolCall[];
   toolResults?: ToolResult[];
+  citations?: GroundedCitation[];
+  latencyTelemetry?: LatencyTelemetry;
+  guardrailNotice?: string;
   isStreaming?: boolean;
 }
 
