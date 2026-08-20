@@ -1,6 +1,5 @@
 import { ChatMessage, LLMConfig, ToolCall } from '../types';
-import { getOpenAITools, getGeminiFunctionDeclarations, SYSTEM_TOOLS } from './toolsSchema';
-import { LocalKnowledgeEngine } from './localKnowledgeEngine';
+import { getOpenAITools, getGeminiFunctionDeclarations } from './toolsSchema';
 
 export interface LLMResponseChunk {
   content?: string;
@@ -20,78 +19,74 @@ export class LLMClient {
   }
 
   private getEnrichedSystemPrompt(): string {
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const timeStr = now.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    return `${this.config.systemPrompt}\n\n[Live Environment Context: Today is ${dateStr}, Current Time is ${timeStr} (${tz}). Platform: Windows/Cross-Platform Desktop. User: Computer Science Engineering Student. Support CS topics like DSA, Operating Systems, DBMS, Networks, and Code Debugging.]`;
+    return (
+      'You are an intelligent, versatile, and direct AI desktop assistant.\n' +
+      'Answer user questions accurately, concisely, and naturally across all general knowledge, coding, analysis, and reasoning domains.\n' +
+      'Execute tool calls (file search, task scheduling, email, git, database) when explicitly requested or required.\n' +
+      'Do not use rigid canned templates or generic disclaimers.'
+    );
   }
 
   /**
-   * Execute chat generation with streaming, tool calling, and instant fallback
+   * Execute real generative AI inference with streaming, function calling, and dual cloud/local fallback.
    */
   public async *streamChat(
     messages: ChatMessage[],
     signal?: AbortSignal
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
-    try {
-      switch (this.config.provider) {
-        case 'ollama':
-          yield* this.streamOllama(messages, signal);
-          break;
-        case 'gemini':
-          yield* this.streamGemini(messages, signal);
-          break;
-        case 'openai':
-        case 'llamacpp':
-          yield* this.streamOpenAICompatible(messages, signal);
-          break;
-        case 'anthropic':
-          yield* this.streamAnthropic(messages, signal);
-          break;
-        default:
-          yield* this.streamOllama(messages, signal);
+    // 1. Primary Cloud Inference: Google Gemini 2.0 Flash
+    if (this.config.provider === 'gemini' && this.config.geminiApiKey?.trim()) {
+      try {
+        yield* this.streamGemini(messages, signal);
+        return;
+      } catch (err: any) {
+        console.warn('Gemini stream failed, attempting local Ollama fallback:', err);
       }
-    } catch (err: any) {
-      console.warn('Primary LLM provider failed, switching to Instant Local Knowledge Engine:', err);
-      yield* this.streamLocalFallback(messages, err?.message || 'Connection offline');
-    }
-  }
-
-  // -------------------------------------------------------------
-  // Built-in Instant Local Knowledge Engine Fallback
-  // -------------------------------------------------------------
-  private async *streamLocalFallback(
-    messages: ChatMessage[],
-    _reason: string
-  ): AsyncGenerator<LLMResponseChunk, void, unknown> {
-    const response = await LocalKnowledgeEngine.processQuery(messages, this.config);
-
-    // Stream word deltas cleanly
-    const words = response.content.split(' ');
-    for (let i = 0; i < words.length; i++) {
-      const delta = (i > 0 ? ' ' : '') + words[i];
-      yield {
-        content: delta,
-        isDone: false,
-      };
-      await new Promise((r) => setTimeout(r, 8));
     }
 
-    yield {
-      toolCalls: response.toolCalls,
-      isDone: true,
-    };
+    // 2. Localhost LLM Inference: Ollama (llama3.2 / qwen2.5 / mistral)
+    try {
+      yield* this.streamOllama(messages, signal);
+      return;
+    } catch (ollamaErr: any) {
+      console.warn('Ollama stream failed:', ollamaErr);
+    }
+
+    // 3. OpenAI / Llama.cpp / Anthropic Providers
+    if (this.config.provider === 'openai' && this.config.openaiApiKey?.trim()) {
+      try {
+        yield* this.streamOpenAICompatible(messages, signal);
+        return;
+      } catch (err) {
+        console.warn('OpenAI stream failed:', err);
+      }
+    }
+
+    if (this.config.provider === 'anthropic' && this.config.anthropicApiKey?.trim()) {
+      try {
+        yield* this.streamAnthropic(messages, signal);
+        return;
+      } catch (err) {
+        console.warn('Anthropic stream failed:', err);
+      }
+    }
+
+    // 4. Honest Unconfigured Guidance (Zero Mock Templates)
+    const notice =
+      '⚠️ **No LLM Engine Connected**\n\n' +
+      'To enable real-time generative AI inference, please connect one of the following:\n\n' +
+      '1. **Google Gemini (Cloud — Recommended):**\n' +
+      '   - Click **Account Profile (👤)** or **Settings (⚙️)** in the top bar.\n' +
+      '   - Enter your free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).\n\n' +
+      '2. **Local Ollama / Llama (100% Offline):**\n' +
+      '   - Run Ollama locally on your computer: `ollama run llama3.2` or `ollama run qwen2.5`.\n' +
+      '   - The assistant will automatically connect to `http://localhost:11434` without requiring any API keys!';
+
+    for (const word of notice.split(' ')) {
+      yield { content: word + ' ', isDone: false };
+      await new Promise((r) => setTimeout(r, 12));
+    }
+    yield { isDone: true };
   }
 
   // -------------------------------------------------------------
@@ -117,17 +112,17 @@ export class LLMClient {
       }),
     ];
 
-    const endpoint = `${this.config.ollamaUrl.replace(/\/$/, '')}/api/chat`;
+    const endpoint = `${(this.config.ollamaUrl || 'http://localhost:11434').replace(/\/$/, '')}/api/chat`;
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: this.config.ollamaModel,
+        model: this.config.ollamaModel || 'llama3.2',
         messages: formattedMessages,
         tools: getOpenAITools(),
         stream: true,
         options: {
-          temperature: this.config.temperature,
+          temperature: this.config.temperature || 0.7,
         },
       }),
       signal,
@@ -153,27 +148,28 @@ export class LLMClient {
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-        try {
-          const json = JSON.parse(trimmed);
-          const toolCalls: ToolCall[] = [];
 
-          if (json.message?.tool_calls) {
-            for (const tc of json.message.tool_calls) {
-              toolCalls.push({
-                id: 'call_' + Math.random().toString(36).substring(2, 9),
-                name: tc.function.name,
-                arguments: tc.function.arguments,
-              });
-            }
+        try {
+          const item = JSON.parse(trimmed);
+          const contentDelta = item.message?.content || '';
+          const rawTools = item.message?.tool_calls;
+
+          let toolCalls: ToolCall[] | undefined = undefined;
+          if (rawTools && Array.isArray(rawTools)) {
+            toolCalls = rawTools.map((t: any) => ({
+              id: 'call_' + Math.random().toString(36).substring(2, 9),
+              name: t.function.name,
+              arguments: t.function.arguments,
+            }));
           }
 
           yield {
-            content: json.message?.content || '',
-            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-            isDone: json.done || false,
+            content: contentDelta,
+            toolCalls,
+            isDone: item.done || false,
           };
         } catch {
-          // ignore
+          // ignore chunk parse errors
         }
       }
     }
@@ -188,13 +184,12 @@ export class LLMClient {
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
     const apiKey = this.config.geminiApiKey;
     if (!apiKey) {
-      throw new Error('Gemini API key is missing. Please add your free key in Settings.');
+      throw new Error('Gemini API key is missing.');
     }
 
     const model = this.config.geminiModel || 'gemini-2.0-flash';
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
 
-    // Filter out welcome message and ensure conversation starts with user message
     const filteredMessages = messages.filter((m) => m.id !== 'welcome');
     const firstUserIndex = filteredMessages.findIndex((m) => m.role === 'user');
     const validMessages = firstUserIndex >= 0 ? filteredMessages.slice(firstUserIndex) : filteredMessages;
@@ -242,7 +237,6 @@ export class LLMClient {
       }
     }
 
-    // Must have at least one user message
     if (contents.length === 0) {
       contents.push({ role: 'user', parts: [{ text: 'Hello' }] });
     }
@@ -254,7 +248,7 @@ export class LLMClient {
       contents,
       tools: getGeminiFunctionDeclarations(),
       generationConfig: {
-        temperature: this.config.temperature,
+        temperature: this.config.temperature || 0.7,
       },
     };
 
@@ -330,6 +324,20 @@ export class LLMClient {
       ? `${this.config.llamacppUrl.replace(/\/$/, '')}/v1/chat/completions`
       : 'https://api.openai.com/v1/chat/completions';
 
+    const formattedMessages = [
+      { role: 'system', content: this.getEnrichedSystemPrompt() },
+      ...messages.map((m) => ({
+        role: m.role === 'tool' ? 'tool' : m.role,
+        content: m.content || '',
+        ...(m.toolResults
+          ? {
+              tool_call_id: m.toolResults[0]?.toolCallId,
+              name: m.toolResults[0]?.name,
+            }
+          : {}),
+      })),
+    ];
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -338,30 +346,22 @@ export class LLMClient {
       headers['Authorization'] = `Bearer ${this.config.openaiApiKey}`;
     }
 
-    const payload = {
-      model: isLlamaCpp ? 'default' : this.config.openaiModel,
-      messages: [
-        { role: 'system', content: this.getEnrichedSystemPrompt() },
-        ...messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-      ],
-      tools: getOpenAITools(),
-      stream: true,
-      temperature: this.config.temperature,
-    };
-
     const response = await fetch(endpoint, {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        model: isLlamaCpp ? 'local-model' : this.config.openaiModel,
+        messages: formattedMessages,
+        tools: getOpenAITools(),
+        stream: true,
+        temperature: this.config.temperature,
+      }),
       signal,
     });
 
     if (!response.ok || !response.body) {
       const errorText = await response.text().catch(() => response.statusText);
-      throw new Error(`OpenAI/Llama.cpp Error (${response.status}): ${errorText}`);
+      throw new Error(`OpenAI-compatible Error (${response.status}): ${errorText}`);
     }
 
     const reader = response.body.getReader();
@@ -379,31 +379,17 @@ export class LLMClient {
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || !trimmed.startsWith('data: ')) continue;
-        const dataStr = trimmed.substring(6);
-        if (dataStr === '[DONE]') {
-          yield { isDone: true };
-          return;
-        }
+        const jsonStr = trimmed.substring(6).trim();
+        if (!jsonStr || jsonStr === '[DONE]') continue;
 
         try {
-          const json = JSON.parse(dataStr);
-          const delta = json.choices?.[0]?.delta;
-          const toolCalls: ToolCall[] = [];
-
-          if (delta?.tool_calls) {
-            for (const tc of delta.tool_calls) {
-              toolCalls.push({
-                id: tc.id || 'call_' + Math.random().toString(36).substring(2, 9),
-                name: tc.function?.name,
-                arguments: tc.function?.arguments ? JSON.parse(tc.function.arguments) : {},
-              });
-            }
-          }
+          const item = JSON.parse(jsonStr);
+          const delta = item.choices?.[0]?.delta;
+          const isFinished = Boolean(item.choices?.[0]?.finish_reason);
 
           yield {
             content: delta?.content || '',
-            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-            isDone: false,
+            isDone: isFinished,
           };
         } catch {
           // ignore
@@ -413,41 +399,39 @@ export class LLMClient {
   }
 
   // -------------------------------------------------------------
-  // Anthropic Claude Streamer (/v1/messages)
+  // Anthropic Claude Streamer (messages API)
   // -------------------------------------------------------------
   private async *streamAnthropic(
     messages: ChatMessage[],
     signal?: AbortSignal
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
-    if (!this.config.anthropicApiKey) {
-      throw new Error('Anthropic API key is not configured.');
+    const apiKey = this.config.anthropicApiKey;
+    if (!apiKey) {
+      throw new Error('Anthropic API key is missing.');
     }
 
     const endpoint = 'https://api.anthropic.com/v1/messages';
+    const formattedMessages = messages
+      .filter((m) => m.role !== 'system')
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content || '',
+      }));
+
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        'x-api-key': this.config.anthropicApiKey,
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'dangerously-allow-browser': 'true',
       },
       body: JSON.stringify({
         model: this.config.anthropicModel || 'claude-3-5-sonnet-20241022',
+        messages: formattedMessages,
         system: this.getEnrichedSystemPrompt(),
-        max_tokens: 4096,
-        messages: messages
-          .filter((m) => m.role !== 'system')
-          .map((m) => ({
-            role: m.role === 'assistant' ? 'assistant' : 'user',
-            content: m.content,
-          })),
-        tools: SYSTEM_TOOLS.map((t) => ({
-          name: t.name,
-          description: t.description,
-          input_schema: t.parameters,
-        })),
+        max_tokens: 2048,
         stream: true,
+        temperature: this.config.temperature,
       }),
       signal,
     });
@@ -472,15 +456,16 @@ export class LLMClient {
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const jsonStr = trimmed.substring(6).trim();
+
         try {
-          const json = JSON.parse(trimmed.substring(6));
-          if (json.type === 'content_block_delta' && json.delta?.text) {
+          const item = JSON.parse(jsonStr);
+          if (item.type === 'content_block_delta') {
             yield {
-              content: json.delta.text,
+              content: item.delta?.text || '',
               isDone: false,
             };
-          }
-          if (json.type === 'message_stop') {
+          } else if (item.type === 'message_stop') {
             yield { isDone: true };
           }
         } catch {
