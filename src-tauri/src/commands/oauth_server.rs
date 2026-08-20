@@ -12,6 +12,7 @@ pub struct OAuthTokensPayload {
     pub access_token: String,
     pub refresh_token: Option<String>,
     pub expires_in: Option<u64>,
+    pub expires_at_timestamp: Option<u64>,
     pub token_type: Option<String>,
 }
 
@@ -33,7 +34,9 @@ pub async fn start_oauth_loopback_flow(
     let scopes = [
         "https://www.googleapis.com/auth/gmail.send",
         "https://www.googleapis.com/auth/gmail.readonly",
+        "https://www.googleapis.com/auth/gmail.modify",
         "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/drive.file",
         "https://www.googleapis.com/auth/userinfo.email",
         "https://www.googleapis.com/auth/userinfo.profile",
     ]
@@ -166,10 +169,15 @@ async fn exchange_code_for_tokens(
         let expires_in = data["expires_in"].as_u64();
         let token_type = data["token_type"].as_str().map(|s| s.to_string());
 
+        let expires_at_timestamp = expires_in.map(|exp| {
+            chrono::Utc::now().timestamp() as u64 + exp
+        });
+
         Ok(OAuthTokensPayload {
             access_token,
             refresh_token,
             expires_in,
+            expires_at_timestamp,
             token_type,
         })
     } else {

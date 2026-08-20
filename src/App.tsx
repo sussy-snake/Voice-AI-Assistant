@@ -17,6 +17,7 @@ import { CosmicCanvas } from './components/CosmicCanvas';
 import { isTauri } from './services/tauriBridge';
 import { initializePresetKnowledge } from './services/rag/presetKnowledge';
 import { TokenHealthService } from './services/auth/tokenHealthService';
+import { BackgroundTokenDaemon } from './services/auth/backgroundTokenDaemon';
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
   provider: 'gemini',
@@ -89,37 +90,23 @@ export function App() {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isResearchDrawerOpen, setIsResearchDrawerOpen] = useState(false);
 
-  // Initialize preset RAG knowledge documents
+  // Initialize preset RAG knowledge documents and Autonomous Background Token Daemon
   useEffect(() => {
     initializePresetKnowledge();
-  }, []);
 
-  // Background Self-Healing Token Auto-Refresh Daemon
-  useEffect(() => {
-    const autoRefreshDaemon = async () => {
-      if (!config.googleRefreshToken) return;
-
-      try {
-        const googleStatus = await TokenHealthService.verifyGoogleToken(config.googleAccessToken || '');
-        if (!googleStatus.isValid || googleStatus.isExpiringSoon) {
-          const res = await TokenHealthService.refreshGoogleToken(config.googleRefreshToken);
-          if (res.success && res.newAccessToken) {
-            console.info('Self-Healing Token Daemon: Auto-refreshed Google Access Token silently!');
-            const updated = { ...config, googleAccessToken: res.newAccessToken };
-            setConfig(updated);
-            localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
-          }
-        }
-      } catch (e) {
-        console.warn('Self-Healing Token Daemon warning:', e);
+    BackgroundTokenDaemon.startDaemon(
+      () => config,
+      (newToken) => {
+        const updated = { ...config, googleAccessToken: newToken };
+        setConfig(updated);
+        localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
       }
+    );
+
+    return () => {
+      BackgroundTokenDaemon.stopDaemon();
     };
-
-    autoRefreshDaemon();
-    const daemonInterval = setInterval(autoRefreshDaemon, 180000);
-
-    return () => clearInterval(daemonInterval);
-  }, [config.googleAccessToken, config.googleRefreshToken]);
+  }, [config.googleRefreshToken]);
 
   // Initialize Agent Orchestrator
   const {

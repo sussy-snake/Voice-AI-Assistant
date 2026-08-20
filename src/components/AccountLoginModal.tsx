@@ -9,11 +9,13 @@ import {
   Sparkles,
   Zap,
   ClipboardPaste,
+  FileCode,
 } from 'lucide-react';
 import { LLMConfig } from '../types';
 import { TokenHealthService } from '../services/auth/tokenHealthService';
 import { TokenExtractor } from '../services/auth/tokenExtractor';
 import { OAuthLoopbackClient } from '../services/auth/oauthLoopbackClient';
+import { ServiceAccountAuth } from '../services/auth/serviceAccountAuth';
 
 interface AccountLoginModalProps {
   isOpen: boolean;
@@ -174,15 +176,39 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
             <p className="text-[11px] text-slate-300">
               Launches your default browser, captures authorization tokens automatically via local loopback, and saves them to encrypted vault.
             </p>
-            <button
-              type="button"
-              onClick={handleStartLoopbackSignIn}
-              disabled={isLoopbackListening}
-              className="w-full py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center justify-center space-x-2 shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02] active:scale-98"
-            >
-              <Zap className={`w-4 h-4 ${isLoopbackListening ? 'animate-spin' : ''}`} />
-              <span>{isLoopbackListening ? 'Listening on 127.0.0.1:8989...' : 'Sign In with Google (Zero-Friction)'}</span>
-            </button>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleStartLoopbackSignIn}
+                disabled={isLoopbackListening}
+                className="py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center justify-center space-x-1.5 shadow-lg shadow-blue-600/30 transition-all hover:scale-[1.02] active:scale-98 text-[11px]"
+              >
+                <Zap className={`w-3.5 h-3.5 ${isLoopbackListening ? 'animate-spin' : ''}`} />
+                <span>{isLoopbackListening ? 'Listening...' : 'Sign In (Browser)'}</span>
+              </button>
+
+              <label className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold flex items-center justify-center space-x-1.5 border border-white/10 cursor-pointer transition-all hover:scale-[1.02] active:scale-98 text-[11px]">
+                <FileCode className="w-3.5 h-3.5 text-accent-cyan" />
+                <span>Service Account Key</span>
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const text = await file.text();
+                    const res = await ServiceAccountAuth.getAccessToken(text);
+                    if (res.success && res.accessToken) {
+                      setGoogleAccessToken(res.accessToken);
+                      setStatusMsg('🎉 Headless Service Account token generated via RSA256 JWT!');
+                    } else {
+                      setStatusMsg(`Service Account Error: ${res.message}`);
+                    }
+                  }}
+                />
+              </label>
+            </div>
           </div>
 
           {/* ⚡ Instant 1-Click OAuth Link Parser Box */}
