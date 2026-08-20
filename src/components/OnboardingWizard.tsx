@@ -10,7 +10,6 @@ import {
   Zap,
   Mail,
   ArrowRight,
-  ShieldCheck,
 } from 'lucide-react';
 import { LLMConfig } from '../types';
 import { CredentialVault } from '../services/auth/credentialVault';
