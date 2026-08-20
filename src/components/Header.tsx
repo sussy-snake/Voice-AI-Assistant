@@ -10,11 +10,10 @@ import {
   Zap,
   GitBranch,
   Mail,
-  Activity,
   Database,
   ShieldCheck,
 } from 'lucide-react';
-import { SystemStatus, LLMConfig, VoiceMode, HardwareComputeProfile } from '../types';
+import { SystemStatus, LLMConfig, VoiceMode } from '../types';
 import { TauriBridge } from '../services/tauriBridge';
 import { TokenHealthService, OverallTokenHealth } from '../services/auth/tokenHealthService';
 
@@ -46,7 +45,6 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleVoiceMode,
 }) => {
   const [stats, setStats] = useState<SystemStatus | null>(null);
-  const [computeProfile, setComputeProfile] = useState<HardwareComputeProfile | null>(null);
   const [tokenHealth, setTokenHealth] = useState<OverallTokenHealth | null>(null);
 
   useEffect(() => {
@@ -54,15 +52,6 @@ export const Header: React.FC<HeaderProps> = ({
       try {
         const data = await TauriBridge.getSystemStatus();
         setStats(data);
-      } catch {
-        // ignore
-      }
-    };
-
-    const fetchCompute = async () => {
-      try {
-        const comp = await TauriBridge.getHardwareComputeProfile();
-        setComputeProfile(comp);
       } catch {
         // ignore
       }
@@ -83,7 +72,6 @@ export const Header: React.FC<HeaderProps> = ({
     };
 
     fetchStats();
-    fetchCompute();
     checkTokens();
 
     const interval = setInterval(fetchStats, 3000);

@@ -10,7 +10,6 @@ import {
   GitBranch,
   Mail,
   Zap,
-  Lock,
 } from 'lucide-react';
 import { LLMConfig } from '../types';
 import { TokenHealthService, OverallTokenHealth } from '../services/auth/tokenHealthService';
