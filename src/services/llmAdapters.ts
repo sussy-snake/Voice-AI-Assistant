@@ -258,16 +258,22 @@ export class LLMClient {
     let response: Response | null = null;
     let lastErrorText = '';
 
+    const userModel = (this.config.geminiModel || 'gemini-1.5-flash').trim().replace(/^models\//i, '');
+
     const candidateUrls = apiKey
       ? [
+          `https://generativelanguage.googleapis.com/v1beta/models/${userModel}:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-001:streamGenerateContent?key=${apiKey}&alt=sse`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:streamGenerateContent?key=${apiKey}&alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?key=${apiKey}&alt=sse`,
         ]
       : [
+          `https://generativelanguage.googleapis.com/v1beta/models/${userModel}:streamGenerateContent?alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?alt=sse`,
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse`,
         ];
@@ -288,16 +294,20 @@ export class LLMClient {
 
         if (res.ok && res.body) {
           response = res;
+          console.info(`[Gemini] Connected successfully via: ${url.split('?')[0]}`);
           break;
         } else {
           lastErrorText = await res.text().catch(() => res.statusText);
+          console.warn(`[Gemini Candidate Failed ${res.status}] ${url.split('?')[0]}:`, lastErrorText);
         }
       } catch (err: any) {
         lastErrorText = err.message || 'Fetch error';
+        console.warn(`[Gemini Candidate Network Error] ${url.split('?')[0]}:`, err);
       }
     }
 
     if (!response || !response.body) {
+      console.error('[Gemini All Candidates Exhausted]', { lastErrorText });
       throw new Error(`Gemini API Error: ${lastErrorText}`);
     }
 

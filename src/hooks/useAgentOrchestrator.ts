@@ -208,7 +208,17 @@ export function useAgentOrchestrator(config: LLMConfig) {
       setMessages((prev) => [...prev, userMessage]);
       setIsProcessing(true);
 
-      const client = new LLMClient(config);
+      let activeConfig = config;
+      try {
+        const saved = localStorage.getItem('voice_ai_llm_config');
+        if (saved) {
+          activeConfig = { ...config, ...JSON.parse(saved) };
+        }
+      } catch {
+        // ignore
+      }
+
+      const client = new LLMClient(activeConfig);
       abortControllerRef.current = new AbortController();
 
       const currentHistory: ChatMessage[] = [...messages, userMessage];
