@@ -7,9 +7,12 @@ import {
   CheckCircle2,
   ExternalLink,
   Sparkles,
+  Zap,
+  ClipboardPaste,
 } from 'lucide-react';
 import { LLMConfig } from '../types';
 import { TokenHealthService } from '../services/auth/tokenHealthService';
+import { TokenExtractor } from '../services/auth/tokenExtractor';
 
 interface AccountLoginModalProps {
   isOpen: boolean;
@@ -37,10 +40,35 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
   const [githubToken, setGithubToken] = useState(config.githubToken || '');
   const [googleAccessToken, setGoogleAccessToken] = useState(config.googleAccessToken || '');
   const [googleRefreshToken, setGoogleRefreshToken] = useState(config.googleRefreshToken || '');
+  const [oauthUrlInput, setOauthUrlInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleExtractFromUrl = (urlOrText: string) => {
+    if (!urlOrText.trim()) return;
+    const extracted = TokenExtractor.extractTokens(urlOrText);
+    if (extracted.success) {
+      if (extracted.accessToken) setGoogleAccessToken(extracted.accessToken);
+      if (extracted.refreshToken) setGoogleRefreshToken(extracted.refreshToken);
+      setStatusMsg(extracted.message);
+      setOauthUrlInput('');
+    } else {
+      setStatusMsg(`Notice: ${extracted.message}`);
+    }
+  };
+
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        handleExtractFromUrl(text);
+      }
+    } catch {
+      setStatusMsg('Please paste the OAuth link directly into the box below.');
+    }
+  };
 
   const handleAutoCaptureAndSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +76,6 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
     setStatusMsg('Verifying credentials and syncing profile...');
 
     try {
-      // Test credentials in background
       await TokenHealthService.checkAllHealth({
         githubToken,
         geminiApiKey: geminiKey,
@@ -111,6 +138,46 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
             </div>
           )}
 
+          {/* ⚡ Instant 1-Click OAuth Link Parser Box */}
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-accent-cyan/40 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-200 flex items-center space-x-1.5 text-accent-cyan">
+                <Zap className="w-4 h-4 text-accent-cyan" />
+                <span>⚡ Auto-Extract from OAuth Link or URL</span>
+              </span>
+              <button
+                type="button"
+                onClick={handlePasteFromClipboard}
+                className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-accent-cyan border border-accent-cyan/30 flex items-center space-x-1 text-[11px]"
+              >
+                <ClipboardPaste className="w-3 h-3" />
+                <span>Paste from Clipboard</span>
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Paste the OAuth Playground URL from your browser, and we will automatically extract and auto-fill both the Access Token and Refresh Token for you:
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Paste URL (https://developers.google.com/oauthplayground/#...)"
+                value={oauthUrlInput}
+                onChange={(e) => {
+                  setOauthUrlInput(e.target.value);
+                  handleExtractFromUrl(e.target.value);
+                }}
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white font-mono text-[11px] focus:border-accent-cyan"
+              />
+              <button
+                type="button"
+                onClick={() => handleExtractFromUrl(oauthUrlInput)}
+                className="px-3 py-1.5 rounded-lg bg-accent-cyan text-slate-950 font-bold hover:bg-cyan-400 transition-colors"
+              >
+                Auto-Extract
+              </button>
+            </div>
+          </div>
+
           {/* User Name & Google Email */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -142,7 +209,7 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
             <div className="flex items-center justify-between font-semibold text-slate-200">
               <span className="flex items-center space-x-1.5 text-accent-rose">
                 <Mail className="w-3.5 h-3.5" />
-                <span>Google OAuth Tokens (Gmail & Calendar)</span>
+                <span>Google OAuth Tokens (Auto-Filled)</span>
               </span>
               <a
                 href="https://developers.google.com/oauthplayground"
@@ -150,26 +217,33 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
                 rel="noopener noreferrer"
                 className="text-[10px] text-accent-cyan hover:underline flex items-center space-x-0.5"
               >
-                <span>OAuth Helper</span>
+                <span>Open Playground</span>
                 <ExternalLink className="w-2.5 h-2.5" />
               </a>
             </div>
 
             <div className="space-y-1.5">
-              <input
-                type="password"
-                placeholder="Google Access Token (ya29.a0...)"
-                value={googleAccessToken}
-                onChange={(e) => setGoogleAccessToken(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono text-[11px]"
-              />
-              <input
-                type="password"
-                placeholder="Google Refresh Token (1//04... for permanent auto-refresh)"
-                value={googleRefreshToken}
-                onChange={(e) => setGoogleRefreshToken(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono text-[11px]"
-              />
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-0.5">Access Token (ya29...)</label>
+                <input
+                  type="password"
+                  placeholder="ya29.a0..."
+                  value={googleAccessToken}
+                  onChange={(e) => setGoogleAccessToken(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono text-[11px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-slate-400 mb-0.5">Refresh Token (1//04...)</label>
+                <input
+                  type="password"
+                  placeholder="1//04... (Enables Permanent Auto-Refresh)"
+                  value={googleRefreshToken}
+                  onChange={(e) => setGoogleRefreshToken(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white font-mono text-[11px]"
+                />
+              </div>
             </div>
           </div>
 
