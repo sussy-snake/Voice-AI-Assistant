@@ -267,7 +267,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               )}
 
               {localConfig.provider === 'openai' && (
-                <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2.5">
+                <div className="p-3 rounded-xl bg-slate-900/80 border border-emerald-800/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-emerald-300 flex items-center space-x-1">
+                      <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>OpenAI Configuration</span>
+                    </span>
+                    <a
+                      href="https://platform.openai.com/api-keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center space-x-1 text-emerald-400 hover:underline text-[11px]"
+                    >
+                      <span>Get OpenAI Key</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+
                   <div>
                     <label className="block text-slate-400 mb-1">OpenAI API Key</label>
                     <input
@@ -275,18 +291,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={localConfig.openaiApiKey}
                       onChange={(e) => setLocalConfig({ ...localConfig, openaiApiKey: e.target.value })}
                       className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-white font-mono"
-                      placeholder="sk-..."
+                      placeholder="sk-proj-..."
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 mb-1">Model</label>
-                    <input
-                      type="text"
-                      value={localConfig.openaiModel}
+                    <label className="block text-slate-400 mb-1">OpenAI Model</label>
+                    <select
+                      value={localConfig.openaiModel || 'gpt-4o-mini'}
                       onChange={(e) => setLocalConfig({ ...localConfig, openaiModel: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-white font-mono"
-                      placeholder="gpt-4o-mini"
-                    />
+                      className="w-full bg-slate-950 border border-slate-800 rounded-md p-2 text-white text-xs"
+                    >
+                      <option value="gpt-4o-mini">gpt-4o-mini (Recommended - Fast & Smart)</option>
+                      <option value="gpt-4o">gpt-4o (Omni Flagship Multi-modal)</option>
+                      <option value="o3-mini">o3-mini (Deep Reasoning / STEM)</option>
+                      <option value="gpt-4-turbo">gpt-4-turbo (High Context)</option>
+                    </select>
                   </div>
                 </div>
               )}

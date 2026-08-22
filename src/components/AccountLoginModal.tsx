@@ -25,6 +25,8 @@ interface AccountLoginModalProps {
     userName: string;
     googleEmail?: string;
     geminiApiKey?: string;
+    openaiApiKey?: string;
+    openaiModel?: string;
     githubToken?: string;
     googleAccessToken?: string;
     googleRefreshToken?: string;
@@ -40,6 +42,8 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
   const [userName, setUserName] = useState(config.userName || 'Harsh');
   const [googleEmail, setGoogleEmail] = useState('jaytriharshvardhan@gmail.com');
   const [geminiKey, setGeminiKey] = useState(config.geminiApiKey || '');
+  const [openaiKey, setOpenaiKey] = useState(config.openaiApiKey || '');
+  const [openaiModel, setOpenaiModel] = useState(config.openaiModel || 'gpt-4o-mini');
   const [githubToken, setGithubToken] = useState(config.githubToken || '');
   const [googleAccessToken, setGoogleAccessToken] = useState(config.googleAccessToken || '');
   const [googleRefreshToken, setGoogleRefreshToken] = useState(config.googleRefreshToken || '');
@@ -91,6 +95,8 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
         userName: userName.trim(),
         googleEmail: googleEmail.trim(),
         geminiApiKey: geminiKey.trim(),
+        openaiApiKey: openaiKey.trim(),
+        openaiModel: openaiModel.trim(),
         githubToken: githubToken.trim(),
         googleAccessToken: googleAccessToken.trim(),
         googleRefreshToken: googleRefreshToken.trim(),
@@ -334,8 +340,48 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
             </div>
           </div>
 
-          {/* Gemini & GitHub API Keys */}
-          <div className="space-y-2">
+          {/* Gemini, OpenAI & GitHub API Keys */}
+          <div className="space-y-3">
+            {/* OpenAI API Key */}
+            <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-emerald-300 font-semibold flex items-center space-x-1.5">
+                  <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>OpenAI API Key (GPT-4o / o3-mini)</span>
+                </label>
+                <a
+                  href="https://platform.openai.com/api-keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-emerald-400 hover:underline flex items-center space-x-0.5"
+                >
+                  <span>Get OpenAI Key</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
+                </a>
+              </div>
+              <input
+                type="password"
+                placeholder="sk-proj-..."
+                value={openaiKey}
+                onChange={(e) => setOpenaiKey(e.target.value)}
+                className="w-full bg-slate-950 border border-emerald-800/60 rounded-lg p-2 text-white font-mono text-[11px] focus:border-emerald-400"
+              />
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-slate-400">OpenAI Model:</span>
+                <select
+                  value={openaiModel}
+                  onChange={(e) => setOpenaiModel(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-[11px]"
+                >
+                  <option value="gpt-4o-mini">gpt-4o-mini (Fast & Smart)</option>
+                  <option value="gpt-4o">gpt-4o (Omni Flagship)</option>
+                  <option value="o3-mini">o3-mini (Deep Reasoning)</option>
+                  <option value="gpt-4-turbo">gpt-4-turbo</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Google Gemini Key */}
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-slate-300 font-medium">Google Gemini API Key</label>
@@ -357,6 +403,7 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
               />
             </div>
 
+            {/* GitHub Token */}
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-slate-300 font-medium">GitHub Token (Optional)</label>

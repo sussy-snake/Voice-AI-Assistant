@@ -36,6 +36,17 @@ export class LLMClient {
   ): AsyncGenerator<LLMResponseChunk, void, unknown> {
     const errors: string[] = [];
 
+    // 0. Explicit OpenAI Provider
+    if (this.config.provider === 'openai' && this.config.openaiApiKey?.trim()) {
+      try {
+        yield* this.streamOpenAICompatible(messages, signal);
+        return;
+      } catch (err: any) {
+        errors.push(`OpenAI: ${err.message || err}`);
+        console.warn('OpenAI stream failed, attempting fallback:', err);
+      }
+    }
+
     // 1. Google Gemini (Official Cloud)
     if (this.config.provider === 'gemini' || this.config.geminiApiKey?.trim() || this.config.googleAccessToken?.trim()) {
       try {
@@ -67,22 +78,22 @@ export class LLMClient {
       console.warn('Ollama stream failed:', ollamaErr);
     }
 
-    // 4. OpenRouter / OpenAI / Anthropic
+    // 4. OpenAI (as fallback if key exists) / OpenRouter / Anthropic
+    if (this.config.openaiApiKey?.trim()) {
+      try {
+        yield* this.streamOpenAICompatible(messages, signal);
+        return;
+      } catch (err: any) {
+        errors.push(`OpenAI: ${err.message || err}`);
+      }
+    }
+
     if (this.config.provider === 'openrouter' || this.config.openrouterApiKey?.trim()) {
       try {
         yield* this.streamOpenRouter(messages, signal);
         return;
       } catch (err: any) {
         errors.push(`OpenRouter: ${err.message || err}`);
-      }
-    }
-
-    if (this.config.provider === 'openai' && this.config.openaiApiKey?.trim()) {
-      try {
-        yield* this.streamOpenAICompatible(messages, signal);
-        return;
-      } catch (err: any) {
-        errors.push(`OpenAI: ${err.message || err}`);
       }
     }
 

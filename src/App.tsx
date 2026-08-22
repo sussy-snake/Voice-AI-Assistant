@@ -176,6 +176,8 @@ export function App() {
     userName: string;
     googleEmail?: string;
     geminiApiKey?: string;
+    openaiApiKey?: string;
+    openaiModel?: string;
     githubToken?: string;
     googleAccessToken?: string;
     googleRefreshToken?: string;
@@ -183,10 +185,13 @@ export function App() {
     const updated: LLMConfig = {
       ...config,
       userName: profile.userName,
-      geminiApiKey: profile.geminiApiKey || config.geminiApiKey,
-      githubToken: profile.githubToken || config.githubToken,
-      googleAccessToken: profile.googleAccessToken || config.googleAccessToken,
-      googleRefreshToken: profile.googleRefreshToken || config.googleRefreshToken,
+      geminiApiKey: profile.geminiApiKey ?? config.geminiApiKey,
+      openaiApiKey: profile.openaiApiKey ?? config.openaiApiKey,
+      openaiModel: profile.openaiModel ?? config.openaiModel,
+      provider: profile.openaiApiKey ? 'openai' : config.provider,
+      githubToken: profile.githubToken ?? config.githubToken,
+      googleAccessToken: profile.googleAccessToken ?? config.googleAccessToken,
+      googleRefreshToken: profile.googleRefreshToken ?? config.googleRefreshToken,
     };
     setConfig(updated);
     localStorage.setItem('voice_ai_llm_config', JSON.stringify(updated));
