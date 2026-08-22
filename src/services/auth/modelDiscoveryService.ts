@@ -6,7 +6,9 @@ export class ModelDiscoveryService {
    * Dynamically query Google API for active generateContent models
    */
   public static async discoverGeminiModels(apiKey: string): Promise<string[]> {
-    if (!apiKey || apiKey.trim().length < 10) return ['gemini-1.5-flash', 'gemini-1.5-pro'];
+    if (!apiKey || apiKey.trim().length < 10) {
+      return ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    }
 
     if (this.cachedGeminiModels && this.cachedGeminiModels.length > 0) {
       return this.cachedGeminiModels;
@@ -21,8 +23,10 @@ export class ModelDiscoveryService {
           .map((m: any) => m.name.replace(/^models\//i, ''))
           .filter((slug: string) => !slug.includes('embedding') && !slug.includes('aqa'));
 
-        // Sort flash models to the top
+        // Sort 2.5 and flash models to the top
         models.sort((a: string, b: string) => {
+          if (a.includes('2.5') && !b.includes('2.5')) return -1;
+          if (!a.includes('2.5') && b.includes('2.5')) return 1;
           if (a.includes('flash') && !b.includes('flash')) return -1;
           if (!a.includes('flash') && b.includes('flash')) return 1;
           return 0;
@@ -37,7 +41,7 @@ export class ModelDiscoveryService {
       console.warn('Dynamic Gemini model discovery warning:', e);
     }
 
-    return ['gemini-1.5-flash', 'gemini-1.5-pro'];
+    return ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
   }
 
   /**

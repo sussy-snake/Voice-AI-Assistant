@@ -26,7 +26,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
   ollamaModel: 'llama3.1:latest',
   llamacppUrl: 'http://localhost:8080',
   geminiApiKey: '',
-  geminiModel: 'gemini-1.5-flash',
+  geminiModel: 'gemini-2.5-flash',
   openaiApiKey: '',
   openaiModel: 'gpt-4o-mini',
   anthropicApiKey: '',
@@ -176,6 +176,7 @@ export function App() {
     userName: string;
     googleEmail?: string;
     geminiApiKey?: string;
+    geminiModel?: string;
     openaiApiKey?: string;
     openaiModel?: string;
     githubToken?: string;
@@ -186,9 +187,10 @@ export function App() {
       ...config,
       userName: profile.userName,
       geminiApiKey: profile.geminiApiKey ?? config.geminiApiKey,
+      geminiModel: profile.geminiModel ?? config.geminiModel,
       openaiApiKey: profile.openaiApiKey ?? config.openaiApiKey,
       openaiModel: profile.openaiModel ?? config.openaiModel,
-      provider: profile.openaiApiKey ? 'openai' : config.provider,
+      provider: profile.geminiApiKey ? 'gemini' : profile.openaiApiKey ? 'openai' : config.provider,
       githubToken: profile.githubToken ?? config.githubToken,
       googleAccessToken: profile.googleAccessToken ?? config.googleAccessToken,
       googleRefreshToken: profile.googleRefreshToken ?? config.googleRefreshToken,

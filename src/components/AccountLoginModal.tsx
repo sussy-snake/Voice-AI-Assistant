@@ -25,6 +25,7 @@ interface AccountLoginModalProps {
     userName: string;
     googleEmail?: string;
     geminiApiKey?: string;
+    geminiModel?: string;
     openaiApiKey?: string;
     openaiModel?: string;
     githubToken?: string;
@@ -42,6 +43,7 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
   const [userName, setUserName] = useState(config.userName || 'Harsh');
   const [googleEmail, setGoogleEmail] = useState('jaytriharshvardhan@gmail.com');
   const [geminiKey, setGeminiKey] = useState(config.geminiApiKey || '');
+  const [geminiModel, setGeminiModel] = useState(config.geminiModel || 'gemini-2.5-flash');
   const [openaiKey, setOpenaiKey] = useState(config.openaiApiKey || '');
   const [openaiModel, setOpenaiModel] = useState(config.openaiModel || 'gpt-4o-mini');
   const [githubToken, setGithubToken] = useState(config.githubToken || '');
@@ -95,6 +97,7 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
         userName: userName.trim(),
         googleEmail: googleEmail.trim(),
         geminiApiKey: geminiKey.trim(),
+        geminiModel: geminiModel.trim(),
         openaiApiKey: openaiKey.trim(),
         openaiModel: openaiModel.trim(),
         githubToken: githubToken.trim(),
@@ -382,16 +385,20 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
             </div>
 
             {/* Google Gemini Key */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-slate-300 font-medium">Google Gemini API Key</label>
+            <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-500/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-blue-300 font-semibold flex items-center space-x-1.5">
+                  <Zap className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Google Gemini API Key (Gemini 2.5 / 1.5)</span>
+                </label>
                 <a
                   href="https://aistudio.google.com/app/apikey"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[10px] text-accent-cyan hover:underline"
+                  className="text-[10px] text-blue-400 hover:underline flex items-center space-x-0.5"
                 >
-                  Get Free Key
+                  <span>Get Free Key</span>
+                  <ExternalLink className="w-2.5 h-2.5" />
                 </a>
               </div>
               <input
@@ -399,8 +406,22 @@ export const AccountLoginModal: React.FC<AccountLoginModalProps> = ({
                 placeholder="AIzaSy..."
                 value={geminiKey}
                 onChange={(e) => setGeminiKey(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-white font-mono text-[11px]"
+                className="w-full bg-slate-950 border border-blue-800/60 rounded-lg p-2 text-white font-mono text-[11px] focus:border-blue-400"
               />
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-slate-400">Gemini Model:</span>
+                <select
+                  value={geminiModel}
+                  onChange={(e) => setGeminiModel(e.target.value)}
+                  className="bg-slate-900 border border-slate-800 rounded px-2 py-1 text-white text-[11px]"
+                >
+                  <option value="gemini-2.5-flash">gemini-2.5-flash (Next-Gen Fast & Intelligent)</option>
+                  <option value="gemini-2.5-pro">gemini-2.5-pro (Deep Reasoning & Coding)</option>
+                  <option value="gemini-2.0-flash">gemini-2.0-flash (Gemini 2.0 Flash)</option>
+                  <option value="gemini-1.5-flash">gemini-1.5-flash (Production Standard)</option>
+                  <option value="gemini-1.5-pro">gemini-1.5-pro (High Context)</option>
+                </select>
+              </div>
             </div>
 
             {/* GitHub Token */}
